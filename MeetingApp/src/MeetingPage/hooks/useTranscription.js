@@ -26,15 +26,22 @@ export function useTranscription(aiEnabled, audioEnabled, userName, onResult) {
     }, [onResult]);
 
     const stopRecognition = useCallback(() => {
+        isRunningRef.current = false;
         if (recognitionRef.current) {
-            isRunningRef.current = false;
             try {
-                recognitionRef.current.stop();
+                recognitionRef.current.onend = null;
+                recognitionRef.current.onerror = null;
+                recognitionRef.current.onresult = null;
+                recognitionRef.current.abort();
             } catch (_) {
-                // ignore if already stopped
+                try {
+                    recognitionRef.current.stop();
+                } catch (__) {}
             }
+            recognitionRef.current = null;
         }
     }, []);
+
 
     useEffect(() => {
         if (!aiEnabled || !audioEnabled) {

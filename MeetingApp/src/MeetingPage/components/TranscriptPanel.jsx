@@ -8,16 +8,35 @@ import styles from './TranscriptPanel.module.css';
  * @param {boolean}  isOpen     - Controlled open/close state
  * @param {Function} onToggle   - Called when the toggle button is clicked
  */
-const TranscriptPanel = ({ entries = [], isOpen, onToggle }) => {
+/**
+ * TranscriptPanel — collapsible right-side panel displaying live meeting transcript.
+ *
+ * @param {Array}    entries        - [{ id, speaker, speaker_id, text, timestamp }]
+ * @param {boolean}  isOpen         - Controlled open/close state
+ * @param {Function} onToggle       - Called when the toggle button is clicked
+ * @param {string}   participantId  - The current user's unique session participant ID
+ * @param {string}   localUserName  - The current user's display name
+ */
+const TranscriptPanel = ({
+    entries = [],
+    isOpen,
+    onToggle,
+    participantId,
+    localUserName,
+}) => {
     const bottomRef = useRef(null);
     const [animateLast, setAnimateLast] = useState(false);
+    const [editingId, setEditingId] = useState(null);
+    const [editText, setEditText] = useState('');
+    const [editError, setEditError] = useState('');
+    const [isSaving, setIsSaving] = useState(false);
 
     // Auto-scroll to the latest entry
     useEffect(() => {
-        if (isOpen && bottomRef.current) {
+        if (isOpen && bottomRef.current && !editingId) {
             bottomRef.current.scrollIntoView({ behavior: 'smooth' });
         }
-    }, [entries, isOpen]);
+    }, [entries, isOpen, editingId]);
 
     // Pulse animation on new entry
     useEffect(() => {
@@ -37,6 +56,53 @@ const TranscriptPanel = ({ entries = [], isOpen, onToggle }) => {
             });
         } catch {
             return '';
+        }
+    };
+
+    const handleStartEdit = (entry) => {
+        setEditingId(entry.id || entry.timestamp);
+        setEditText(entry.text);
+        setEditError('');
+    };
+
+    const handleCancelEdit = () => {
+        setEditingId(null);
+        setEditText('');
+        setEditError('');
+    };
+
+    const handleSaveEdit = async (entry) => {
+        if (!editText.trim()) {
+            setEditError('Text cannot be empty');
+            return;
+        }
+
+        setIsSaving(true);
+        setEditError('');
+
+        try {
+            const response = await fetch(`http://127.0.0.1:8000/transcript/edit/${entry.id}/`, {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    participant_id: participantId,
+                    text: editText.trim(),
+                }),
+            });
+
+            const data = await response.json();
+
+            if (response.ok && data.success) {
+                setEditingId(null);
+                setEditText('');
+            } else {
+                setEditError(data.message || 'Could not update transcript entry.');
+            }
+        } catch (err) {
+            console.error('[EDIT] Failed to update transcript entry:', err);
+            setEditError('Failed to connect to server.');
+        } finally {
+            setIsSaving(false);
         }
     };
 
@@ -93,16 +159,65 @@ const TranscriptPanel = ({ entries = [], isOpen, onToggle }) => {
                     ) : (
                         entries.map((entry, idx) => {
                             const isLatest = idx === entries.length - 1;
+                            const entryKey = entry.id ? `id-${entry.id}` : `${entry.timestamp}-${idx}`;
+                            const isEditing = editingId === (entry.id || entry.timestamp);
+                            
+                            // Authorization: A participant can edit ONLY their own transcript entries.
+                            const isOwn = entry.speaker_id
+                                ? entry.speaker_id === participantId
+                                : entry.speaker === localUserName;
+
                             return (
                                 <div
-                                    key={`${entry.timestamp}-${idx}`}
+                                    key={entryKey}
                                     className={`${styles.entry} ${isLatest && animateLast ? styles.entryNew : ''}`}
                                 >
                                     <div className={styles.entryMeta}>
-                                        <span className={styles.entrySpeaker}>{entry.speaker}</span>
+                                        <div className={styles.entrySpeakerGroup}>
+                                            <span className={styles.entrySpeaker}>{entry.speaker}</span>
+                                            {isOwn && !isEditing && entry.id && (
+                                                <button
+                                                    className={styles.editBtn}
+                                                    onClick={() => handleStartEdit(entry)}
+                                                    title="Edit your transcript entry"
+                                                    aria-label="Edit transcript entry"
+                                                >
+                                                    ✎
+                                                </button>
+                                            )}
+                                        </div>
                                         <span className={styles.entryTime}>{formatTime(entry.timestamp)}</span>
                                     </div>
-                                    <p className={styles.entryText}>{entry.text}</p>
+
+                                    {isEditing ? (
+                                        <div className={styles.editContainer}>
+                                            <textarea
+                                                className={styles.editInput}
+                                                value={editText}
+                                                onChange={(e) => setEditText(e.target.value)}
+                                                rows={2}
+                                            />
+                                            {editError && <div className={styles.editError}>{editError}</div>}
+                                            <div className={styles.editActions}>
+                                                <button
+                                                    className={styles.saveBtn}
+                                                    onClick={() => handleSaveEdit(entry)}
+                                                    disabled={isSaving}
+                                                >
+                                                    {isSaving ? 'Saving...' : 'Save'}
+                                                </button>
+                                                <button
+                                                    className={styles.cancelBtn}
+                                                    onClick={handleCancelEdit}
+                                                    disabled={isSaving}
+                                                >
+                                                    Cancel
+                                                </button>
+                                            </div>
+                                        </div>
+                                    ) : (
+                                        <p className={styles.entryText}>{entry.text}</p>
+                                    )}
                                 </div>
                             );
                         })
@@ -123,3 +238,4 @@ const TranscriptPanel = ({ entries = [], isOpen, onToggle }) => {
 };
 
 export default TranscriptPanel;
+

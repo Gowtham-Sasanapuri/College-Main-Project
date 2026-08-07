@@ -23,9 +23,13 @@ const VideoTile = forwardRef(function VideoTile(
     // Attach remote stream whenever it changes
     useEffect(() => {
         if (!isLocal && videoRef.current && stream) {
-            videoRef.current.srcObject = stream;
+            if (videoRef.current.srcObject !== stream) {
+                videoRef.current.srcObject = stream;
+            }
+            videoRef.current.play().catch(err => console.log('[VIDEO] Auto-play caught:', err));
         }
     }, [stream, isLocal, videoRef]);
+
 
     return (
         <div className={`${styles.tile} ${isLocal ? styles.localTile : ''}`}>

@@ -31,21 +31,14 @@ export function useWebRTC(meetingId, userName, initialAiEnabled = false) {
     /** @type {React.MutableRefObject<Map<string, RTCPeerConnection>>} */
     const peerConnections       = useRef(new Map());
 
+    // Unique, stable participant session ID for edit authorization
+    const participantIdRef      = useRef(
+        typeof crypto !== 'undefined' && crypto.randomUUID
+            ? crypto.randomUUID()
+            : 'p_' + Math.random().toString(36).substring(2) + Date.now().toString(36)
+    );
+
     // ── Runtime AI flag ───────────────────────────────────────────────
-    //
-    // WHY A REF AND NOT A PROP?
-    //
-    // The onmessage handler is defined once inside openSocket() and captures
-    // its surrounding variables via closure. If we checked the `aiEnabled`
-    // prop/state inside that closure, joiners would always read `false` because
-    // their location.state never carries aiEnabled.
-    //
-    // A ref is the correct tool: it is mutable and always reflects the latest
-    // value at the moment the handler reads it, even though the handler was
-    // created earlier. We write to aiEnabledRef.current immediately after the
-    // API response arrives — before openSocket() is called — so by the time
-    // any Transcript message is received, the ref already holds the correct
-    // server-confirmed value for every participant.
     const aiEnabledRef = useRef(initialAiEnabled);
 
     // ── State (drives re-render) ───────────────────────────────────────
@@ -56,11 +49,12 @@ export function useWebRTC(meetingId, userName, initialAiEnabled = false) {
     const [connectionStatus, setConnectionStatus] = useState('connecting');
 
     // meetingAiEnabled — the server-confirmed value exposed to the UI.
-    // Starts as the prop hint; overwritten by the API response for every participant.
     const [meetingAiEnabled, setMeetingAiEnabled] = useState(initialAiEnabled);
 
     // Transcript entries — populated for ALL participants when the meeting has AI on.
     const [transcriptEntries, setTranscriptEntries] = useState([]);
+    const [isMeetingEnded,    setIsMeetingEnded]    = useState(false);
+
 
     // ── Local media ───────────────────────────────────────────────────
 
@@ -91,21 +85,6 @@ export function useWebRTC(meetingId, userName, initialAiEnabled = false) {
         }
     });
 
-    /**
-     * tryGetLocalStream — fault-tolerant wrapper around getLocalStream.
-     *
-     * WHY THIS EXISTS:
-     * getUserMedia throws a DOMException when the user denies camera/microphone
-     * permission. Any function that awaits getLocalStream() directly will abort
-     * if permission is denied, which blocks the WebSocket join, peer connection
-     * setup, and the entire meeting.
-     *
-     * tryGetLocalStream() catches that rejection, logs a warning, and sets
-     * audioEnabled/videoEnabled to false so the UI reflects reality. It always
-     * resolves (never rejects), returning the stream on success or null on denial.
-     * Callers that receive null simply skip adding local tracks — a valid WebRTC
-     * state where the participant can still receive remote streams.
-     */
     const tryGetLocalStream = useCallback(async () => {
         try {
             return await getLocalStream();
@@ -114,9 +93,6 @@ export function useWebRTC(meetingId, userName, initialAiEnabled = false) {
                 '[MEDIA] Could not acquire camera/microphone:', err.message,
                 '— joining as audio/video-off participant.'
             );
-            // Reflect the actual media state in the UI immediately.
-            // This also prevents useTranscription from trying to start
-            // SpeechRecognition when there is no microphone available.
             setVideoEnabled(false);
             setAudioEnabled(false);
             return null;
@@ -144,7 +120,7 @@ export function useWebRTC(meetingId, userName, initialAiEnabled = false) {
         };
 
         pc.ontrack = (event) => {
-            const stream = event.streams[0];
+            const stream = (event.streams && event.streams[0]) ? event.streams[0] : new MediaStream([event.track]);
             setRemoteStreams(prev => {
                 const exists = prev.some(s => s.name === remoteName);
                 if (exists) {
@@ -176,9 +152,6 @@ export function useWebRTC(meetingId, userName, initialAiEnabled = false) {
                 }
             });
         } else {
-            // Participant has no local media — add recvonly transceivers
-            // so SDP offers/answers include m=audio and m=video sections,
-            // enabling this peer to receive remote audio and video.
             const transceivers = pc.getTransceivers();
             const hasAudio = transceivers.some(t => t.receiver.track?.kind === 'audio' || t.mid?.includes('audio'));
             const hasVideo = transceivers.some(t => t.receiver.track?.kind === 'video' || t.mid?.includes('video'));
@@ -195,10 +168,6 @@ export function useWebRTC(meetingId, userName, initialAiEnabled = false) {
     // ── Offer / Answer / Candidate ────────────────────────────────────
 
     const sendOffer = useCallback(async (remoteName) => {
-        // tryGetLocalStream (not getLocalStream) — permission denial must not
-        // abort the offer. A participant without media can still negotiate a
-        // peer connection and receive the remote stream. addLocalTracks() already
-        // guards on null, so no tracks are added when media is unavailable.
         await tryGetLocalStream();
         const pc = createPeerConnection(remoteName);
         addLocalTracks(pc);
@@ -218,8 +187,6 @@ export function useWebRTC(meetingId, userName, initialAiEnabled = false) {
 
     const handleIncomingOffer = useCallback(async ({ sender, PeerOffer }) => {
         console.log(`[OFFER RECEIVED] from ${sender}`);
-        // Same rationale as sendOffer — never throw on media denial.
-        // addLocalTracks guards on null so the answer is always sent.
         await tryGetLocalStream();
         const pc = createPeerConnection(sender);
         addLocalTracks(pc);
@@ -271,36 +238,26 @@ export function useWebRTC(meetingId, userName, initialAiEnabled = false) {
 
     // ── Transcript helpers ────────────────────────────────────────────
 
-    /**
-     * Send a transcript entry via WebSocket.
-     *
-     * Reads from aiEnabledRef (not the prop) so the latest server-confirmed
-     * value is always used regardless of when this callback was created.
-     * No dependency on aiEnabled — removes the need to recreate this function
-     * when aiEnabled changes.
-     */
     const sendTranscriptEntry = useCallback((speaker, text) => {
-        // Guard reads from the ref, not a stale closure value
         if (!aiEnabledRef.current) return;
         if (socket.current?.readyState !== WebSocket.OPEN) return;
         socket.current.send(JSON.stringify({
-            message:   'Transcript',
+            message:    'Transcript',
             speaker,
+            speaker_id: participantIdRef.current,
             text,
-            timestamp: new Date().toISOString(),
+            timestamp:  new Date().toISOString(),
         }));
-    }, []); // stable — reads from ref at call time, no prop deps needed
+    }, []);
 
-    /**
-     * Seed transcript with history returned by JoinMeeting (for late joiners).
-     * The caller guards with aiEnabledRef.current before calling this.
-     */
     const loadTranscriptHistory = useCallback((entries) => {
         if (!Array.isArray(entries) || entries.length === 0) return;
         setTranscriptEntries(entries.map(e => ({
-            speaker:   e.speaker,
-            text:      e.text,
-            timestamp: e.timestamp,
+            id:         e.id,
+            speaker:    e.speaker,
+            speaker_id: e.speaker_id || '',
+            text:       e.text,
+            timestamp:  e.timestamp,
         })));
     }, []);
 
@@ -353,43 +310,45 @@ export function useWebRTC(meetingId, userName, initialAiEnabled = false) {
                     break;
 
                 case 'Transcript':
-                    // ── FIX FOR BUG 1 ────────────────────────────────────
-                    // Previously checked `aiEnabled` (the prop), which is `false`
-                    // for every joiner because JoinMeet.jsx never puts aiEnabled
-                    // in location.state. That caused every joiner to silently
-                    // discard incoming Transcript messages.
-                    //
-                    // Now we read from `aiEnabledRef.current`, which is written
-                    // from the JoinMeeting API response BEFORE this socket is
-                    // opened. Both the host and every joiner will have the correct
-                    // server-confirmed value here, so all participants process the
-                    // message and update their transcriptEntries state.
                     if (aiEnabledRef.current) {
                         setTranscriptEntries(prev => [
                             ...prev,
                             {
-                                speaker:   data.speaker,
-                                text:      data.text,
-                                timestamp: data.timestamp,
+                                id:         data.id,
+                                speaker:    data.speaker,
+                                speaker_id: data.speaker_id || '',
+                                text:       data.text,
+                                timestamp:  data.timestamp,
                             },
                         ]);
                     }
                     break;
 
+                case 'TranscriptUpdate':
+                    if (aiEnabledRef.current && data.id) {
+                        setTranscriptEntries(prev => prev.map(e =>
+                            e.id === data.id ? { ...e, text: data.text } : e
+                        ));
+                    }
+                    break;
+
+                case 'MeetingEnded':
+                    console.log('[WS] Meeting ended by host');
+                    setIsMeetingEnded(true);
+                    break;
+
                 default:
                     console.warn('[WS] Unknown message type:', data.message);
             }
+
         };
 
-        // Seed existing history for late joiners.
-        // aiEnabledRef.current is already set from the API response at this point.
         if (aiEnabledRef.current && Array.isArray(transcriptHistory) && transcriptHistory.length > 0) {
             loadTranscriptHistory(transcriptHistory);
         }
     }, [
         meetingId,
         userName,
-        // aiEnabled intentionally removed — handled via aiEnabledRef
         addParticipant,
         removeParticipant,
         sendOffer,
@@ -398,6 +357,7 @@ export function useWebRTC(meetingId, userName, initialAiEnabled = false) {
         handleIncomingCandidate,
         loadTranscriptHistory,
     ]);
+
 
     // ── Controls ──────────────────────────────────────────────────────
 
@@ -503,5 +463,9 @@ export function useWebRTC(meetingId, userName, initialAiEnabled = false) {
         // Expose the server-confirmed flag so Meeting.jsx can drive all rendering
         // decisions from it instead of from location.state.aiEnabled
         meetingAiEnabled,
+        participantId: participantIdRef.current,
+        isMeetingEnded,
     };
 }
+
+

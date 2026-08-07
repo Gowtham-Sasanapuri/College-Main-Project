@@ -22,5 +22,8 @@ urlpatterns = [
     path('admin/', admin.site.urls),
     path("createLink/", views.CreateLink),
     path("JoinMeeting/", views.SearchMeeting),
+    path("endMeeting/", views.EndMeeting),
+    path("transcript/edit/<int:entry_id>/", views.UpdateTranscript),
     path("transcript/<str:meeting_id>/", views.GetTranscript),
 ]
+

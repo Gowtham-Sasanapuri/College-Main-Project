@@ -47,6 +47,12 @@ class MyConsumer(AsyncWebsocketConsumer):
 
         await self.channel_layer.group_discard(self.room_name, self.channel_name)
 
+        # Automatically clean up the meeting from the database when participant count == 0
+        if len(room) == 0:
+            ROOMS.pop(self.room_name, None)
+            await self._cleanup_meeting_if_empty(self.room_name)
+
+
     # ------------------------------------------------------------------ #
     #  Receive — dispatch by message type                                  #
     # ------------------------------------------------------------------ #
@@ -177,6 +183,7 @@ class MyConsumer(AsyncWebsocketConsumer):
         2. Broadcast it to every participant in the room (including sender).
         """
         speaker = data.get("speaker", self.display_name or "Unknown")
+        speaker_id = data.get("speaker_id", "")
         text = data.get("text", "").strip()
         meeting_id = self.room_name
 
@@ -184,9 +191,9 @@ class MyConsumer(AsyncWebsocketConsumer):
             return
 
         # Persist to DB
-        entry = await self._save_transcript_entry(meeting_id, speaker, text)
+        entry = await self._save_transcript_entry(meeting_id, speaker, speaker_id, text)
         if entry is None:
-            print(f"[TRANSCRIPT] Could not save entry — meeting {meeting_id} not found or AI disabled")
+            # Silently ignore transcripts after meeting ended or when AI is disabled
             return
 
         print(f"[TRANSCRIPT] {speaker}: {text[:60]}")
@@ -196,7 +203,9 @@ class MyConsumer(AsyncWebsocketConsumer):
             self.room_name,
             {
                 "type": "send_transcript",
+                "id": entry["id"],
                 "speaker": speaker,
+                "speaker_id": speaker_id,
                 "text": text,
                 "timestamp": entry["timestamp"],
             },
@@ -251,10 +260,27 @@ class MyConsumer(AsyncWebsocketConsumer):
         """Broadcast a transcript entry to this client."""
         await self.send(text_data=json.dumps({
             "message": "Transcript",
+            "id": event.get("id"),
             "speaker": event["speaker"],
+            "speaker_id": event.get("speaker_id", ""),
             "text": event["text"],
             "timestamp": event["timestamp"],
         }))
+
+    async def send_transcript_update(self, event):
+        """Broadcast an edited transcript update to this client."""
+        await self.send(text_data=json.dumps({
+            "message": "TranscriptUpdate",
+            "id": event["id"],
+            "text": event["text"],
+        }))
+
+    async def send_meeting_ended(self, event):
+        """Notify clients that the meeting has ended."""
+        await self.send(text_data=json.dumps({
+            "message": "MeetingEnded",
+        }))
+
 
     # ------------------------------------------------------------------ #
     #  Helpers                                                             #
@@ -269,7 +295,7 @@ class MyConsumer(AsyncWebsocketConsumer):
         return None
 
     @database_sync_to_async
-    def _save_transcript_entry(self, meeting_id, speaker, text):
+    def _save_transcript_entry(self, meeting_id, speaker, speaker_id, text):
         """
         Persist a TranscriptEntry synchronously (called via database_sync_to_async).
         Returns a dict with the saved entry data, or None if meeting not found/AI disabled.
@@ -277,18 +303,30 @@ class MyConsumer(AsyncWebsocketConsumer):
         from .models import Meeting, TranscriptEntry
         try:
             meeting = Meeting.objects.get(Meeting_id=meeting_id)
-            if not meeting.ai_enabled:
+            if not meeting.ai_enabled or not meeting.Status:
                 return None
             entry = TranscriptEntry.objects.create(
                 meeting=meeting,
                 speaker_name=speaker,
+                speaker_id=speaker_id,
                 text=text,
             )
             return {
                 "id": entry.pk,
                 "speaker": entry.speaker_name,
+                "speaker_id": entry.speaker_id,
                 "text": entry.text,
                 "timestamp": entry.timestamp.isoformat(),
             }
         except Meeting.DoesNotExist:
             return None
+
+    @database_sync_to_async
+    def _cleanup_meeting_if_empty(self, meeting_id):
+        """Clean up the meeting record when all participants have left."""
+        from .models import Meeting
+        try:
+            Meeting.objects.filter(Meeting_id=meeting_id).delete()
+            print(f"[CLEANUP] Meeting {meeting_id} deleted (0 participants remaining).")
+        except Exception as exc:
+            print(f"[CLEANUP] Error deleting meeting {meeting_id}: {exc}")

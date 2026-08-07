@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { useParams, useLocation } from 'react-router-dom';
 import { useWebRTC } from './hooks/useWebRTC';
 import { useTranscription } from './hooks/useTranscription';
@@ -28,51 +28,112 @@ const Meeting = () => {
         hangUp,
         transcriptEntries,
         sendTranscriptEntry,
-        // meetingAiEnabled — server-confirmed; use this for ALL rendering decisions.
-        // For the host it equals initialAiEnabled immediately.
-        // For joiners it starts false and becomes true once the API responds.
         meetingAiEnabled,
+        participantId,
+        isMeetingEnded,
     } = useWebRTC(id, name, initialAiEnabled);
 
     // Panel visibility — closed by default; opens automatically when the server
     // confirms AI is on for this meeting (works for both host and joiner).
     const [transcriptOpen, setTranscriptOpen] = useState(false);
+    const [transcriptUserControlled, setTranscriptUserControlled] = useState(false);
+    const [endDialogOpen, setEndDialogOpen] = useState(false);
+    const [summaryLoading, setSummaryLoading] = useState(false);
+    const [summaryError, setSummaryError] = useState('');
+    const [summaryMessage, setSummaryMessage] = useState('');
+    const [summaryText, setSummaryText] = useState('');
+    const [summaryReady, setSummaryReady] = useState(false);
 
-    useEffect(() => {
-        if (meetingAiEnabled) {
-            setTranscriptOpen(true);
+    // Live speech recognition
+    const { stopRecognition } = useTranscription(
+        meetingAiEnabled && !isMeetingEnded,
+        audioEnabled,
+        name,
+        sendTranscriptEntry
+    );
+
+    const closeEndDialog = () => {
+        if (summaryLoading) return;
+        setEndDialogOpen(false);
+        setSummaryError('');
+        setSummaryMessage('');
+        setSummaryText('');
+        setSummaryReady(false);
+    };
+
+    const handleHangUp = () => {
+        if (!meetingAiEnabled) {
+            stopRecognition();
+            hangUp();
+            return;
         }
-    }, [meetingAiEnabled]);
 
-    // ── FIX FOR BUG 2 (speaker identification) ────────────────────────
-    //
-    // useTranscription now receives `meetingAiEnabled` (server-confirmed) instead
-    // of `initialAiEnabled` (from location.state, always false for joiners).
-    //
-    // Effect: once the API confirms AI is on, every participant's browser starts
-    // its own SpeechRecognition instance and calls sendTranscriptEntry with that
-    // participant's own `name`. Speaker attribution is therefore always correct
-    // for real multi-user sessions (different browsers / different devices).
-    //
-    // Same-browser tab limitation (Edge multi-tab testing):
-    // When multiple tabs run in the same browser process, they all share the
-    // same physical microphone. Every tab's SpeechRecognition hears the same
-    // audio, so all tabs will transcribe simultaneously and attribute the text
-    // to their own user's name. This causes duplicate entries and does NOT
-    // reflect which tab the user is "speaking into" — that concept does not
-    // exist at the OS level. This is an inherent limitation of same-browser
-    // testing, not a bug. With separate browsers or devices each participant's
-    // mic is isolated and attribution is correct.
-    // Pass `audioEnabled` so SpeechRecognition pauses when the mic is muted.
-    // Without this, the recognition engine opens its own independent OS-level
-    // audio capture that is unaffected by the WebRTC track.enabled toggle,
-    // causing transcription to continue even when the participant is muted.
-    useTranscription(meetingAiEnabled, audioEnabled, name, sendTranscriptEntry);
+        setSummaryError('');
+        setSummaryMessage('');
+        setSummaryText('');
+        setSummaryReady(false);
+        setEndDialogOpen(true);
+    };
+
+    const handleLeaveOnly = () => {
+        if (summaryLoading) return;
+        stopRecognition();
+        setEndDialogOpen(false);
+        hangUp();
+    };
+
+    const transcriptPanelOpen = transcriptUserControlled ? transcriptOpen : meetingAiEnabled;
+
+    const endMeetingRequest = async (generateSummary) => {
+        setSummaryLoading(true);
+        setSummaryError('');
+        setSummaryMessage('');
+        setSummaryText('');
+        setSummaryReady(false);
+
+        try {
+            const response = await fetch('http://127.0.0.1:8000/endMeeting/', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    meeting_id: id,
+                    generate_summary: generateSummary,
+                }),
+            });
+
+            const data = await response.json();
+
+            if (data.success && data.summary_generated) {
+                setSummaryText(data.summary || '');
+                setSummaryReady(true);
+                setEndDialogOpen(true);
+                return;
+            }
+
+            if (data.success && data.no_transcript) {
+                setSummaryMessage(data.message || 'No transcript is available to summarize.');
+                setSummaryReady(true);
+                setEndDialogOpen(true);
+                return;
+            }
+
+            setSummaryError(data.message || 'AI summary could not be generated.');
+            setEndDialogOpen(true);
+        } catch {
+            setSummaryError('AI summary could not be generated.');
+            setEndDialogOpen(true);
+        } finally {
+            setSummaryLoading(false);
+        }
+    };
+
+    const handleGenerateSummary = () => {
+        endMeetingRequest(true);
+    };
 
     const totalParticipants = 1 + remoteStreams.length;
 
     return (
-        // Use meetingAiEnabled — not initialAiEnabled — for every conditional below.
         <div className={`${styles.page} ${meetingAiEnabled && transcriptOpen ? styles.pageWithPanel : ''}`}>
 
             {/* ── Header ──────────────────────────────────────────── */}
@@ -144,20 +205,84 @@ const Meeting = () => {
                 audioEnabled={audioEnabled}
                 onToggleVideo={toggleVideo}
                 onToggleAudio={toggleAudio}
-                onHangUp={hangUp}
+                onHangUp={handleHangUp}
                 participantCount={totalParticipants}
             />
 
             {/* ── Transcript Panel ─────────────────────────────────── */}
-            {/* Gated on meetingAiEnabled — mounts for every participant whose
-                meeting has AI on, not just the creator. */}
             {meetingAiEnabled && (
                 <TranscriptPanel
                     entries={transcriptEntries}
-                    isOpen={transcriptOpen}
-                    onToggle={() => setTranscriptOpen(o => !o)}
+                    isOpen={transcriptPanelOpen}
+                    onToggle={() => {
+                        setTranscriptUserControlled(true);
+                        setTranscriptOpen(o => !o);
+                    }}
+                    participantId={participantId}
+                    localUserName={name}
                 />
             )}
+
+            {/* ── Call Options / Summary Modal ─────────────────────── */}
+            {endDialogOpen && (
+                <div className={styles.modalBackdrop} role="presentation">
+                    <div className={styles.modalCard} role="dialog" aria-modal="true" aria-labelledby="end-meeting-title">
+                        <div className={styles.modalHeader}>
+                            <div>
+                                <p className={styles.modalEyebrow}>Meeting Options</p>
+                                <h2 id="end-meeting-title" className={styles.modalTitle}>
+                                    {summaryReady && (summaryText || summaryMessage || summaryError)
+                                        ? 'Meeting Summary'
+                                        : 'Are you sure you want to leave?'}
+                                </h2>
+                            </div>
+                            {!summaryLoading && (
+                                <button className={styles.modalClose} onClick={closeEndDialog} aria-label="Close end meeting dialog">
+                                    ✕
+                                </button>
+                            )}
+                        </div>
+
+                        {summaryLoading ? (
+                            <div className={styles.modalBody}>
+                                <div className={styles.loadingSpinner} />
+                                <p className={styles.modalStatus}>Generating meeting summary...</p>
+                            </div>
+                        ) : summaryReady ? (
+                            <div className={styles.modalBody}>
+                                {summaryError ? (
+                                    <p className={styles.modalError}>{summaryError}</p>
+                                ) : summaryMessage ? (
+                                    <p className={styles.modalHint}>{summaryMessage}</p>
+                                ) : (
+                                    <pre className={styles.summaryText}>{summaryText}</pre>
+                                )}
+                                <div className={styles.modalActions}>
+                                    <button className={styles.primaryButton} onClick={handleLeaveOnly}>
+                                        Leave
+                                    </button>
+                                </div>
+                            </div>
+                        ) : (
+                            <div className={styles.modalBody}>
+                                <p className={styles.modalHint}>
+                                    Generate an AI summary of the conversation up to this point, or leave the meeting directly.
+                                </p>
+                                <div className={styles.modalActions}>
+                                    <button className={styles.secondaryButton} onClick={handleLeaveOnly}>
+                                        Leave Meeting
+                                    </button>
+                                    <button className={styles.primaryButton} onClick={handleGenerateSummary}>
+                                        Generate Summary
+                                    </button>
+                                </div>
+                            </div>
+                        )}
+                    </div>
+                </div>
+            )}
+
+
         </div>
     );
 };
