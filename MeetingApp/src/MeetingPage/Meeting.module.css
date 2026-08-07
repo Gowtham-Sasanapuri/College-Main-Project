@@ -1,0 +1,262 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+
+/* ── Page shell ─────────────────────────────────────────────────────── */
+.page {
+    font-family: 'Inter', sans-serif;
+    display: flex;
+    flex-direction: column;
+    height: 100dvh;
+    background: #0d0d1a;
+    color: #f0f0f5;
+    overflow: hidden;
+    /* When transcript panel is open, shrink the grid to the left */
+    transition: padding-right 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.pageWithPanel {
+    padding-right: 320px;
+}
+
+/* ── Header ─────────────────────────────────────────────────────────── */
+.header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px 24px;
+    background: rgba(13, 13, 26, 0.9);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.07);
+    backdrop-filter: blur(12px);
+    flex-shrink: 0;
+    z-index: 10;
+}
+
+.headerLeft,
+.headerRight {
+    flex: 1;
+}
+
+.headerRight {
+    display: flex;
+    justify-content: flex-end;
+    align-items: center;
+    gap: 10px;
+}
+
+.headerCenter {
+    display: flex;
+    justify-content: center;
+}
+
+.logo {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.logoIcon {
+    font-size: 22px;
+    color: #6366f1;
+    line-height: 1;
+}
+
+.logoText {
+    font-size: 18px;
+    font-weight: 700;
+    background: linear-gradient(135deg, #6366f1, #a78bfa);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    letter-spacing: -0.3px;
+}
+
+.meetingId {
+    font-size: 13px;
+    color: rgba(240, 240, 245, 0.5);
+    letter-spacing: 0.2px;
+}
+
+.meetingId strong {
+    color: rgba(240, 240, 245, 0.8);
+    font-weight: 600;
+}
+
+/* Status badge */
+.statusBadge {
+    font-size: 12px;
+    font-weight: 600;
+    padding: 4px 10px;
+    border-radius: 20px;
+    letter-spacing: 0.4px;
+}
+
+.connected {
+    background: rgba(74, 222, 128, 0.12);
+    color: #4ade80;
+    border: 1px solid rgba(74, 222, 128, 0.25);
+}
+
+.connecting {
+    background: rgba(251, 191, 36, 0.12);
+    color: #fbbf24;
+    border: 1px solid rgba(251, 191, 36, 0.25);
+}
+
+.error {
+    background: rgba(239, 68, 68, 0.12);
+    color: #f87171;
+    border: 1px solid rgba(239, 68, 68, 0.25);
+}
+
+/* ── AI badge ───────────────────────────────────────────────────────── */
+.aiBadge {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    font-size: 12px;
+    font-weight: 600;
+    padding: 4px 10px;
+    border-radius: 20px;
+    background: rgba(99, 102, 241, 0.12);
+    border: 1px solid rgba(99, 102, 241, 0.3);
+    color: #a78bfa;
+    letter-spacing: 0.3px;
+}
+
+.aiDot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: #6366f1;
+    animation: aiPulse 2s infinite;
+}
+
+/* ── Video Grid ─────────────────────────────────────────────────────── */
+.grid {
+    flex: 1;
+    display: grid;
+    gap: 12px;
+    padding: 16px;
+    padding-bottom: 100px;   /* leave room for the fixed control bar */
+    overflow-y: auto;
+    align-content: start;
+    align-items: stretch;
+    grid-template-columns: 1fr;
+}
+
+/* 1 participant — local only, full width */
+.grid[data-count="1"] {
+    grid-template-columns: 1fr;
+    max-width: 720px;
+    margin: 0 auto;
+    width: 100%;
+}
+
+/* 2 participants — side by side */
+.grid[data-count="2"] {
+    grid-template-columns: repeat(2, 1fr);
+}
+
+/* 3 participants */
+.grid[data-count="3"] {
+    grid-template-columns: repeat(2, 1fr);
+}
+
+/* 4 participants — 2×2 */
+.grid[data-count="4"] {
+    grid-template-columns: repeat(2, 1fr);
+}
+
+/* 5–6 participants — 3 columns */
+.grid[data-count="5"],
+.grid[data-count="6"] {
+    grid-template-columns: repeat(3, 1fr);
+}
+
+/* 7+ — auto-fill with 280px min tiles */
+@media (min-width: 768px) {
+    .grid[data-count="7"],
+    .grid[data-count="8"],
+    .grid[data-count="9"] {
+        grid-template-columns: repeat(3, 1fr);
+    }
+}
+
+/* Responsive fallback for small screens */
+@media (max-width: 640px) {
+    .page {
+        padding-right: 0 !important;
+    }
+
+    .grid {
+        grid-template-columns: 1fr !important;
+        padding: 10px;
+        padding-bottom: 88px;
+        gap: 8px;
+    }
+}
+
+/* ── Waiting card ────────────────────────────────────────────────────── */
+.waitingCard {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    padding: 40px 32px;
+    border-radius: 16px;
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px dashed rgba(255, 255, 255, 0.12);
+    aspect-ratio: 16 / 9;
+    animation: fadeIn 0.4s ease;
+}
+
+.waitingIcon {
+    font-size: 48px;
+    line-height: 1;
+}
+
+.waitingTitle {
+    font-size: 18px;
+    font-weight: 600;
+    color: rgba(240, 240, 245, 0.85);
+    margin: 0;
+}
+
+.waitingHint {
+    font-size: 13px;
+    color: rgba(240, 240, 245, 0.45);
+    margin: 0;
+}
+
+.meetingIdCopy {
+    margin-top: 4px;
+    padding: 8px 16px;
+    border-radius: 8px;
+    background: rgba(99, 102, 241, 0.1);
+    border: 1px solid rgba(99, 102, 241, 0.25);
+}
+
+.idText {
+    font-family: 'Courier New', monospace;
+    font-size: 12px;
+    color: #a78bfa;
+    word-break: break-all;
+}
+
+/* ── Animations ──────────────────────────────────────────────────────── */
+@keyframes fadeIn {
+    from { opacity: 0; transform: translateY(8px); }
+    to   { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes aiPulse {
+    0%, 100% { opacity: 1; box-shadow: 0 0 0 0 rgba(99, 102, 241, 0.4); }
+    50% { opacity: 0.6; box-shadow: 0 0 0 4px rgba(99, 102, 241, 0); }
+}
+
+/* Transcript panel size for medium screens */
+@media (max-width: 1024px) and (min-width: 769px) {
+    .pageWithPanel {
+        padding-right: 280px;
+    }
+}

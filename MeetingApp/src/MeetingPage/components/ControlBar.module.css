@@ -1,0 +1,126 @@
+.bar {
+    position: fixed;
+    bottom: 24px;
+    left: 50%;
+    transform: translateX(-50%);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    padding: 10px 24px;
+    border-radius: 48px;
+    background: rgba(22, 22, 40, 0.85);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(255,255,255,0.04);
+    min-width: 360px;
+    z-index: 100;
+}
+
+/* Left side — participant count */
+.info {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    min-width: 100px;
+}
+
+.dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: #4ade80;
+    box-shadow: 0 0 6px #4ade80;
+    flex-shrink: 0;
+    animation: pulse 2s infinite;
+}
+
+.count {
+    font-family: 'Inter', sans-serif;
+    font-size: 13px;
+    font-weight: 500;
+    color: rgba(240, 240, 245, 0.7);
+    white-space: nowrap;
+}
+
+/* Center — buttons */
+.controls {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.btn {
+    width: 48px;
+    height: 48px;
+    border-radius: 50%;
+    border: none;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(255, 255, 255, 0.1);
+    color: #f0f0f5;
+    transition: background 0.2s ease, transform 0.15s ease, box-shadow 0.2s ease;
+}
+
+.btn:hover {
+    background: rgba(255, 255, 255, 0.18);
+    transform: scale(1.08);
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
+}
+
+.btn:active {
+    transform: scale(0.96);
+}
+
+/* Off state — camera/mic disabled */
+.off {
+    background: rgba(239, 68, 68, 0.25);
+    color: #f87171;
+    border: 1px solid rgba(239, 68, 68, 0.3);
+}
+
+.off:hover {
+    background: rgba(239, 68, 68, 0.35);
+}
+
+/* Hang up — always red */
+.hangUp {
+    background: #ef4444;
+    color: #fff;
+    width: 52px;
+    height: 52px;
+    box-shadow: 0 4px 16px rgba(239, 68, 68, 0.35);
+}
+
+.hangUp:hover {
+    background: #dc2626;
+    box-shadow: 0 4px 24px rgba(239, 68, 68, 0.55);
+}
+
+/* Right spacer — mirrors .info width to keep controls centered */
+.rightSpacer {
+    min-width: 100px;
+}
+
+@keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50%       { opacity: 0.5; }
+}
+
+/* Responsive */
+@media (max-width: 480px) {
+    .bar {
+        min-width: unset;
+        width: calc(100% - 32px);
+        bottom: 16px;
+        padding: 10px 16px;
+    }
+    .info,
+    .rightSpacer {
+        min-width: unset;
+        display: none;
+    }
+}

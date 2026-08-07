@@ -1,0 +1,45 @@
+/* ── Global reset for the lobby ──────────────────────────────────────── */
+* {
+    padding: 0;
+    margin: 0;
+    box-sizing: border-box;
+}
+
+/* ── Navbar bar ──────────────────────────────────────────────────────── */
+.bar {
+    display: flex;
+    align-items: center;
+    padding: 14px 28px;
+    background: rgba(13, 13, 26, 0.92);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.07);
+    backdrop-filter: blur(14px);
+    -webkit-backdrop-filter: blur(14px);
+    position: sticky;
+    top: 0;
+    z-index: 50;
+}
+
+.LogoContainer {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    text-decoration: none;
+}
+
+.logo {
+    width: 36px;
+    height: 36px;
+    /* Tint the SVG icon purple to match the accent */
+    filter: invert(45%) sepia(90%) saturate(700%) hue-rotate(220deg) brightness(110%);
+}
+
+.AppName {
+    font-family: 'Inter', sans-serif;
+    font-size: 1.2rem;
+    font-weight: 700;
+    background: linear-gradient(135deg, #6366f1, #a78bfa);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    letter-spacing: -0.3px;
+}

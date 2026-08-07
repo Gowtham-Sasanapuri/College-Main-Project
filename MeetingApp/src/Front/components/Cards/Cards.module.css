@@ -1,0 +1,118 @@
+/* ── Cards row ───────────────────────────────────────────────────────── */
+.Container {
+    display: flex;
+    align-items: stretch;
+    justify-content: center;
+    gap: 24px;
+    padding: 0 24px 80px;
+    flex-wrap: wrap;
+}
+
+/* ── Individual card ─────────────────────────────────────────────────── */
+.Card {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    width: 280px;
+    padding: 32px 24px;
+    border-radius: 16px;
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid rgba(255, 255, 255, 0.09);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    transition: border-color 0.25s ease, box-shadow 0.25s ease, transform 0.2s ease;
+    cursor: default;
+}
+
+.Card:hover {
+    border-color: rgba(99, 102, 241, 0.45);
+    box-shadow: 0 8px 40px rgba(99, 102, 241, 0.15);
+    transform: translateY(-4px);
+}
+
+/* ── Icon container ──────────────────────────────────────────────────── */
+.ImgContainer {
+    width: 64px;
+    height: 64px;
+    border-radius: 16px;
+    background: rgba(99, 102, 241, 0.12);
+    border: 1px solid rgba(99, 102, 241, 0.25);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-bottom: 20px;
+}
+
+.ImgContainer img {
+    width: 32px;
+    height: 32px;
+    /* Tint SVG icons to indigo */
+    filter: invert(45%) sepia(90%) saturate(700%) hue-rotate(220deg) brightness(110%);
+}
+
+/* ── Card title ──────────────────────────────────────────────────────── */
+.CardInfo {
+    text-align: center;
+    margin-bottom: 8px;
+}
+
+.CardInfo p {
+    font-family: 'Inter', sans-serif;
+    font-size: 1.15rem;
+    font-weight: 700;
+    color: #f0f0f5;
+}
+
+/* ── Card description ────────────────────────────────────────────────── */
+.CardSubContentContainer {
+    flex: 1;
+    display: flex;
+    align-items: flex-start;
+    justify-content: center;
+    padding: 0 4px;
+    margin-bottom: 24px;
+}
+
+.CardSubContentContainer p {
+    font-family: 'Inter', sans-serif;
+    font-size: 0.92rem;
+    color: rgba(240, 240, 245, 0.5);
+    text-align: center;
+    line-height: 1.55;
+}
+
+/* ── CTA button ──────────────────────────────────────────────────────── */
+.MeetingBtn {
+    width: 100%;
+}
+
+.MeetingBtn button {
+    width: 100%;
+    padding: 12px 20px;
+    font-family: 'Inter', sans-serif;
+    font-size: 0.95rem;
+    font-weight: 600;
+    color: #fff;
+    background: linear-gradient(135deg, #6366f1, #7c3aed);
+    border: none;
+    border-radius: 10px;
+    cursor: pointer;
+    transition: box-shadow 0.2s ease, transform 0.15s ease;
+    box-shadow: 0 4px 20px rgba(99, 102, 241, 0.3);
+}
+
+.MeetingBtn button:hover {
+    box-shadow: 0 6px 28px rgba(99, 102, 241, 0.5);
+    transform: translateY(-2px);
+}
+
+.MeetingBtn button:active {
+    transform: translateY(1px);
+    box-shadow: 0 2px 12px rgba(99, 102, 241, 0.3);
+}
+
+/* Differentiate CreateMeeting vs JoinMeeting card on hover */
+.JoinMeeting:hover {
+    border-color: rgba(167, 139, 250, 0.45);
+    box-shadow: 0 8px 40px rgba(167, 139, 250, 0.12);
+}

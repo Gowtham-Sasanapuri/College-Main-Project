@@ -1,0 +1,58 @@
+/* ── Hero / Content section ──────────────────────────────────────────── */
+.Container {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-direction: column;
+    padding: 80px 24px 48px;
+    text-align: center;
+    position: relative;
+    overflow: hidden;
+}
+
+/* Subtle radial glow behind the heading */
+.Container::before {
+    content: '';
+    position: absolute;
+    top: -60px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 600px;
+    height: 400px;
+    background: radial-gradient(ellipse at center, rgba(99, 102, 241, 0.15) 0%, transparent 70%);
+    pointer-events: none;
+}
+
+.heading {
+    position: relative;
+}
+
+.headingContent {
+    font-family: 'Inter', sans-serif;
+    font-size: clamp(2.4rem, 5vw, 4rem);
+    font-weight: 800;
+    color: #f0f0f5;
+    letter-spacing: -1.5px;
+    line-height: 1.1;
+}
+
+/* Highlighted brand name */
+.inline {
+    background: linear-gradient(135deg, #6366f1, #a78bfa);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+}
+
+.SubContentContainer {
+    margin-top: 20px;
+    max-width: 480px;
+}
+
+.SubContent {
+    font-family: 'Inter', sans-serif;
+    font-size: 1.1rem;
+    color: rgba(240, 240, 245, 0.55);
+    line-height: 1.65;
+    font-weight: 400;
+}
