@@ -16,7 +16,7 @@ Including another URLconf
 """
 from django.contrib import admin
 from django.urls import path
-from Meeting import views
+from Meeting import views, room_views
 
 urlpatterns = [
     path('admin/', admin.site.urls),
@@ -25,5 +25,21 @@ urlpatterns = [
     path("endMeeting/", views.EndMeeting),
     path("transcript/edit/<int:entry_id>/", views.UpdateTranscript),
     path("transcript/<str:meeting_id>/", views.GetTranscript),
+
+    # Room Meeting endpoints (addition)
+    path("roomMeeting/create/", room_views.CreateRoomMeeting),
+    path("roomMeeting/process/", room_views.ProcessRoomAudio),
+    path("roomMeeting/transcript/<int:entry_id>/", room_views.UpdateRoomTranscript),
+    path("roomMeeting/generateSummary/", room_views.GenerateRoomSummary),
+
+    # Follow-Up Question endpoints (Video and general)
+    path("meeting/followup/", views.AskFollowUpQuestion),
+    path("meeting/followup/<str:meeting_id>/", views.GetFollowUpHistory),
+    path("meeting/details/<str:meeting_id>/", views.GetMeetingDetails),
+
+    # Room Meeting follow-up endpoints
+    path("roomMeeting/followup/", room_views.AskRoomFollowUpQuestion),
+    path("roomMeeting/followup/<str:meeting_id>/", room_views.GetRoomFollowUpHistory),
+    path("roomMeeting/details/<str:meeting_id>/", room_views.GetRoomMeetingDetails),
 ]
 

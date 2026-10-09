@@ -1,0 +1,590 @@
+.page {
+    min-height: 100vh;
+    background-color: #0b0f19;
+    color: #f1f5f9;
+    font-family: 'Inter', system-ui, -apple-system, sans-serif;
+    display: flex;
+    flex-direction: column;
+}
+
+/* Header */
+.header {
+    height: 64px;
+    padding: 0 24px;
+    background-color: rgba(15, 23, 42, 0.8);
+    backdrop-filter: blur(12px);
+    border-bottom: 1px solid #1e293b;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+
+.headerLeft {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+}
+
+.backBtn {
+    background: transparent;
+    border: 1px solid #334155;
+    color: #94a3b8;
+    padding: 6px 12px;
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 0.85rem;
+    transition: all 0.2s;
+}
+
+.backBtn:hover {
+    color: #fff;
+    border-color: #64748b;
+    background-color: rgba(255, 255, 255, 0.05);
+}
+
+.logo {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.logoIcon {
+    font-size: 1.3rem;
+}
+
+.logoText {
+    font-weight: 700;
+    font-size: 1.1rem;
+    background: linear-gradient(135deg, #38bdf8, #818cf8);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+}
+
+.meetingIdBadge {
+    font-size: 0.9rem;
+    color: #94a3b8;
+    background-color: #1e293b;
+    padding: 4px 12px;
+    border-radius: 20px;
+}
+
+.aiChip {
+    font-size: 0.8rem;
+    color: #c084fc;
+    background-color: rgba(192, 132, 252, 0.1);
+    border: 1px solid rgba(192, 132, 252, 0.3);
+    padding: 4px 12px;
+    border-radius: 20px;
+    font-weight: 600;
+}
+
+/* Main Container */
+.mainContainer {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 40px 24px;
+}
+
+.card {
+    background-color: #1e293b;
+    border: 1px solid #334155;
+    border-radius: 24px;
+    padding: 40px;
+    width: 100%;
+    max-width: 600px;
+    box-shadow: 0 20px 40px rgba(0, 0, 0, 0.4);
+    display: flex;
+    flex-direction: column;
+    gap: 24px;
+}
+
+.cardLarge {
+    background-color: #1e293b;
+    border: 1px solid #334155;
+    border-radius: 24px;
+    padding: 32px;
+    width: 100%;
+    max-width: 900px;
+    box-shadow: 0 20px 40px rgba(0, 0, 0, 0.4);
+    display: flex;
+    flex-direction: column;
+    gap: 24px;
+}
+
+.cardHeader h2 {
+    font-size: 1.6rem;
+    margin: 0 0 6px 0;
+}
+
+.subtitle {
+    color: #94a3b8;
+    font-size: 0.95rem;
+    margin: 0;
+}
+
+.agendaSection {
+    background-color: #0f172a;
+    border-radius: 12px;
+    padding: 16px;
+    border: 1px solid #334155;
+}
+
+.label {
+    font-size: 0.8rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: #64748b;
+    font-weight: 700;
+    display: block;
+    margin-bottom: 6px;
+}
+
+.agendaBox {
+    color: #e2e8f0;
+    font-size: 0.95rem;
+    line-height: 1.5;
+}
+
+.statusGrid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+}
+
+.statusTile {
+    background-color: #0f172a;
+    padding: 16px;
+    border-radius: 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    border: 1px solid #334155;
+}
+
+.statusLabel {
+    font-size: 0.8rem;
+    color: #64748b;
+}
+
+.statusValueReady {
+    color: #4ade80;
+    font-weight: 600;
+}
+
+.statusValueOff {
+    color: #94a3b8;
+}
+
+.errorAlert {
+    background-color: rgba(239, 68, 68, 0.1);
+    border: 1px solid rgba(239, 68, 68, 0.3);
+    color: #fca5a5;
+    padding: 16px;
+    border-radius: 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.retryBtn {
+    align-self: flex-start;
+    background-color: #ef4444;
+    color: white;
+    border: none;
+    padding: 6px 16px;
+    border-radius: 8px;
+    cursor: pointer;
+    font-weight: 600;
+}
+
+.actionCenter {
+    display: flex;
+    justify-content: center;
+    margin-top: 12px;
+}
+
+.tapToStartBtn {
+    background: linear-gradient(135deg, #0284c7, #2563eb);
+    color: white;
+    font-size: 1.2rem;
+    font-weight: 700;
+    padding: 20px 48px;
+    border-radius: 50px;
+    border: none;
+    cursor: pointer;
+    letter-spacing: 0.05em;
+    box-shadow: 0 10px 25px rgba(37, 99, 235, 0.4);
+    transition: all 0.2s;
+}
+
+.tapToStartBtn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 15px 30px rgba(37, 99, 235, 0.6);
+}
+
+/* Recording State */
+.recordingHeader {
+    text-align: center;
+}
+
+.liveIndicator {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+}
+
+.redPulse {
+    width: 14px;
+    height: 14px;
+    background-color: #ef4444;
+    border-radius: 50%;
+    box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.7);
+    animation: pulse 1.5s infinite;
+}
+
+@keyframes pulse {
+    0% {
+        box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.7);
+    }
+    70% {
+        box-shadow: 0 0 0 12px rgba(239, 68, 68, 0);
+    }
+    100% {
+        box-shadow: 0 0 0 0 rgba(239, 68, 68, 0);
+    }
+}
+
+.recordingVisualizer {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    height: 48px;
+    margin: 12px 0;
+}
+
+.waveBar {
+    width: 8px;
+    height: 100%;
+    background-color: #38bdf8;
+    border-radius: 4px;
+    animation: wave 1.2s ease-in-out infinite alternate;
+}
+
+.waveBar:nth-child(2) { animation-delay: 0.2s; }
+.waveBar:nth-child(3) { animation-delay: 0.4s; }
+.waveBar:nth-child(4) { animation-delay: 0.6s; }
+.waveBar:nth-child(5) { animation-delay: 0.8s; }
+
+@keyframes wave {
+    0% { height: 16%; }
+    100% { height: 100%; }
+}
+
+.endMeetingBtn {
+    background-color: #dc2626;
+    color: white;
+    font-size: 1.1rem;
+    font-weight: 700;
+    padding: 16px 40px;
+    border-radius: 50px;
+    border: none;
+    cursor: pointer;
+    box-shadow: 0 8px 20px rgba(220, 38, 38, 0.4);
+    transition: all 0.2s;
+}
+
+.endMeetingBtn:hover {
+    background-color: #b91c1c;
+    transform: translateY(-2px);
+}
+
+/* Modal */
+.modalBackdrop {
+    position: fixed;
+    inset: 0;
+    background-color: rgba(0, 0, 0, 0.75);
+    backdrop-filter: blur(6px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 100;
+}
+
+.modalCard {
+    background-color: #1e293b;
+    border: 1px solid #334155;
+    border-radius: 20px;
+    padding: 32px;
+    max-width: 440px;
+    width: 90%;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+
+.modalActions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 12px;
+    margin-top: 12px;
+}
+
+.cancelBtn {
+    background: transparent;
+    border: 1px solid #475569;
+    color: #cbd5e1;
+    padding: 10px 20px;
+    border-radius: 8px;
+    cursor: pointer;
+}
+
+.confirmEndBtn {
+    background-color: #dc2626;
+    color: white;
+    border: none;
+    padding: 10px 24px;
+    border-radius: 8px;
+    font-weight: 600;
+    cursor: pointer;
+}
+
+/* Progress Steps */
+.progressList {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    margin: 16px 0;
+}
+
+.progressStep {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    padding: 12px 16px;
+    border-radius: 12px;
+    background-color: #0f172a;
+    border: 1px solid #334155;
+    font-size: 0.95rem;
+}
+
+.stepIcon {
+    font-weight: bold;
+    width: 24px;
+    height: 24px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 50%;
+}
+
+.stepDone {
+    color: #4ade80;
+}
+
+.stepDone .stepIcon {
+    background-color: rgba(74, 222, 128, 0.2);
+}
+
+.stepActive {
+    color: #38bdf8;
+}
+
+.stepActive .stepIcon {
+    background-color: rgba(56, 189, 248, 0.2);
+    animation: pulse 1s infinite;
+}
+
+.stepPending {
+    color: #64748b;
+}
+
+/* Complete State */
+.completeHeader {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-bottom: 1px solid #334155;
+    padding-bottom: 20px;
+    flex-wrap: wrap;
+    gap: 16px;
+}
+
+.tabButtons {
+    display: flex;
+    gap: 8px;
+}
+
+.tabBtn {
+    background-color: #0f172a;
+    border: 1px solid #334155;
+    color: #94a3b8;
+    padding: 10px 20px;
+    border-radius: 10px;
+    cursor: pointer;
+    font-weight: 600;
+    transition: all 0.2s;
+}
+
+.tabActive {
+    background-color: #2563eb;
+    color: white;
+    border-color: #2563eb;
+}
+
+.transcriptContainer, .summaryContainer {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+
+.sectionTitle {
+    font-size: 1.2rem;
+    margin: 0;
+    color: #f8fafc;
+}
+
+.entryList {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+
+.transcriptCard {
+    background-color: #0f172a;
+    border: 1px solid #334155;
+    border-radius: 14px;
+    padding: 18px 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.entryHeader {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.speakerTag {
+    font-weight: 700;
+    font-size: 0.9rem;
+    color: #38bdf8;
+    background-color: rgba(56, 189, 248, 0.1);
+    padding: 4px 12px;
+    border-radius: 6px;
+    border: 1px solid rgba(56, 189, 248, 0.2);
+}
+
+.pencilEditBtn {
+    background: transparent;
+    border: 1px solid #334155;
+    color: #94a3b8;
+    padding: 4px 10px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 0.9rem;
+    transition: all 0.2s;
+}
+
+.pencilEditBtn:hover {
+    color: #38bdf8;
+    border-color: #38bdf8;
+    background-color: rgba(56, 189, 248, 0.1);
+}
+
+.entryBodyText {
+    margin: 0;
+    color: #e2e8f0;
+    line-height: 1.6;
+    font-size: 1rem;
+}
+
+/* Inline Edit Box */
+.editBox {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.editTextarea {
+    width: 100%;
+    background-color: #1e293b;
+    border: 1px solid #3b82f6;
+    color: #ffffff;
+    padding: 12px;
+    border-radius: 8px;
+    font-family: inherit;
+    font-size: 0.95rem;
+    resize: vertical;
+    outline: none;
+}
+
+.editErrorMsg {
+    color: #ef4444;
+    font-size: 0.85rem;
+    margin: 0;
+}
+
+.editActions {
+    display: flex;
+    gap: 8px;
+    justify-content: flex-end;
+}
+
+.saveBtn {
+    background-color: #2563eb;
+    color: white;
+    border: none;
+    padding: 6px 16px;
+    border-radius: 6px;
+    font-weight: 600;
+    cursor: pointer;
+}
+
+.cancelEditBtn {
+    background: transparent;
+    border: 1px solid #475569;
+    color: #94a3b8;
+    padding: 6px 16px;
+    border-radius: 6px;
+    cursor: pointer;
+}
+
+/* Summary */
+.summaryHeaderBar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.regenBtn {
+    background-color: #1e293b;
+    border: 1px solid #38bdf8;
+    color: #38bdf8;
+    padding: 8px 16px;
+    border-radius: 8px;
+    font-weight: 600;
+    cursor: pointer;
+    font-size: 0.85rem;
+}
+
+.summaryContent {
+    background-color: #0f172a;
+    border: 1px solid #334155;
+    border-radius: 12px;
+    padding: 24px;
+    white-space: pre-wrap;
+    font-family: 'Inter', system-ui, sans-serif;
+    line-height: 1.7;
+    color: #e2e8f0;
+    font-size: 0.95rem;
+}
+
+.emptyText {
+    color: #94a3b8;
+    font-style: italic;
+}

@@ -1,10 +1,11 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useParams, useLocation } from 'react-router-dom';
 import { useWebRTC } from './hooks/useWebRTC';
 import { useTranscription } from './hooks/useTranscription';
 import VideoTile from './components/VideoTile';
 import ControlBar from './components/ControlBar';
 import TranscriptPanel from './components/TranscriptPanel';
+import FollowUpChat from './components/FollowUpChat';
 import styles from './Meeting.module.css';
 
 const Meeting = () => {
@@ -29,6 +30,7 @@ const Meeting = () => {
         transcriptEntries,
         sendTranscriptEntry,
         meetingAiEnabled,
+        existingSummary,
         participantId,
         isMeetingEnded,
     } = useWebRTC(id, name, initialAiEnabled);
@@ -43,6 +45,15 @@ const Meeting = () => {
     const [summaryMessage, setSummaryMessage] = useState('');
     const [summaryText, setSummaryText] = useState('');
     const [summaryReady, setSummaryReady] = useState(false);
+    const [modalTab, setModalTab] = useState('summary'); // 'summary' | 'followup'
+
+    // Synchronize existing summary if meeting was already summarized
+    useEffect(() => {
+        if (existingSummary && !summaryText) {
+            setSummaryText(existingSummary);
+            setSummaryReady(true);
+        }
+    }, [existingSummary, summaryText]);
 
     // Live speech recognition
     const { stopRecognition } = useTranscription(
@@ -152,6 +163,18 @@ const Meeting = () => {
                 </div>
 
                 <div className={styles.headerRight}>
+                    {summaryReady && summaryText && (
+                        <button
+                            className={styles.viewSummaryBtn}
+                            onClick={() => {
+                                setEndDialogOpen(true);
+                                setModalTab('summary');
+                            }}
+                            title="View Meeting Summary & Follow-Up Questions"
+                        >
+                            ✦ Summary & AI
+                        </button>
+                    )}
                     {meetingAiEnabled && (
                         <span className={styles.aiBadge}>
                             <span className={styles.aiDot} />
@@ -232,9 +255,27 @@ const Meeting = () => {
                                 <p className={styles.modalEyebrow}>Meeting Options</p>
                                 <h2 id="end-meeting-title" className={styles.modalTitle}>
                                     {summaryReady && (summaryText || summaryMessage || summaryError)
-                                        ? 'Meeting Summary'
+                                        ? 'Meeting Summary & AI Follow-Up'
                                         : 'Are you sure you want to leave?'}
                                 </h2>
+                                {summaryReady && summaryText && (
+                                    <div className={styles.modalNav}>
+                                        <button
+                                            type="button"
+                                            className={`${styles.modalTabBtn} ${modalTab === 'summary' ? styles.modalTabActive : ''}`}
+                                            onClick={() => setModalTab('summary')}
+                                        >
+                                            Summary & Key Points
+                                        </button>
+                                        <button
+                                            type="button"
+                                            className={`${styles.modalTabBtn} ${modalTab === 'followup' ? styles.modalTabActive : ''}`}
+                                            onClick={() => setModalTab('followup')}
+                                        >
+                                            ✦ Ask AI Follow-Up
+                                        </button>
+                                    </div>
+                                )}
                             </div>
                             {!summaryLoading && (
                                 <button className={styles.modalClose} onClick={closeEndDialog} aria-label="Close end meeting dialog">
@@ -254,14 +295,39 @@ const Meeting = () => {
                                     <p className={styles.modalError}>{summaryError}</p>
                                 ) : summaryMessage ? (
                                     <p className={styles.modalHint}>{summaryMessage}</p>
+                                ) : modalTab === 'followup' ? (
+                                    <>
+                                        <FollowUpChat meetingId={id} meetingMode="video" isSummaryReady={true} />
+                                        <div className={styles.modalActions}>
+                                            <button
+                                                type="button"
+                                                className={styles.secondaryButton}
+                                                onClick={() => setModalTab('summary')}
+                                            >
+                                                ← Back to Summary
+                                            </button>
+                                            <button className={styles.primaryButton} onClick={handleLeaveOnly}>
+                                                Leave
+                                            </button>
+                                        </div>
+                                    </>
                                 ) : (
-                                    <pre className={styles.summaryText}>{summaryText}</pre>
+                                    <>
+                                        <pre className={styles.summaryText}>{summaryText}</pre>
+                                        <div className={styles.modalActions}>
+                                            <button
+                                                type="button"
+                                                className={styles.followUpSwitchBtn}
+                                                onClick={() => setModalTab('followup')}
+                                            >
+                                                ✦ Ask AI Follow-Up Questions →
+                                            </button>
+                                            <button className={styles.primaryButton} onClick={handleLeaveOnly}>
+                                                Leave
+                                            </button>
+                                        </div>
+                                    </>
                                 )}
-                                <div className={styles.modalActions}>
-                                    <button className={styles.primaryButton} onClick={handleLeaveOnly}>
-                                        Leave
-                                    </button>
-                                </div>
                             </div>
                         ) : (
                             <div className={styles.modalBody}>

@@ -8,12 +8,12 @@ import logging
 import os
 import uuid
 import requests
-from .models import Meeting, TranscriptEntry
+from .models import Meeting, TranscriptEntry, FollowUpMessage
 
 
 
 HF_ROUTER_ENDPOINT = "https://router.huggingface.co/v1/chat/completions"
-HF_MODEL = os.getenv("HF_MODEL", "Qwen/Qwen2.5-7B-Instruct")
+HF_MODEL = os.getenv("HF_MODEL", "Qwen/Qwen3-8B")
 HF_TIMEOUT_SECONDS = int(os.getenv("HF_TIMEOUT_SECONDS", "120"))
 
 logger = logging.getLogger(__name__)
@@ -83,7 +83,7 @@ def _extract_generated_text(payload):
     return ""
 
 
-def _call_hugging_face(prompt):
+def _call_hugging_face_chat(messages):
     hf_token_configured = bool(os.environ.get("HF_TOKEN"))
     logger.info("[HF] token configured: %s", hf_token_configured)
 
@@ -96,12 +96,7 @@ def _call_hugging_face(prompt):
     logger.info("[HF] model=%s", model_name)
 
     payload = {
-        "messages": [
-            {
-                "role": "user",
-                "content": prompt,
-            }
-        ],
+        "messages": messages,
         "model": model_name,
     }
 
@@ -154,6 +149,52 @@ def _call_hugging_face(prompt):
 
     logger.info("[HF] generated content received")
     return generated_text.strip()
+
+
+def _call_hugging_face(prompt):
+    return _call_hugging_face_chat([{"role": "user", "content": prompt}])
+
+
+def _build_followup_system_prompt(agenda, summary, transcript_text):
+    agenda_str = agenda.strip() if agenda and agenda.strip() else "No agenda provided."
+    summary_str = summary.strip() if summary and summary.strip() else "No summary available."
+    transcript_str = transcript_text.strip() if transcript_text and transcript_text.strip() else "No transcript available."
+
+    return (
+        "You are an AI meeting assistant. Your task is to answer follow-up questions about this specific meeting "
+        "based strictly on the meeting context provided below.\n\n"
+        f"=== Meeting Agenda ===\n{agenda_str}\n\n"
+        f"=== Generated Meeting Summary ===\n{summary_str}\n\n"
+        f"=== Meeting Transcript ===\n{transcript_str}\n\n"
+        "=== Strict Grounding Rules ===\n"
+        "1. Answer using ONLY the information provided in the meeting context above.\n"
+        "2. If the user asks about information, topics, decisions, or tasks that are NOT mentioned or found in the "
+        "meeting transcript or summary, clearly and explicitly state:\n"
+        "\"This information was not found in the meeting transcript or summary.\"\n"
+        "Do NOT speculate, guess, invent, or extrapolate details.\n"
+        "3. Always use the exact speaker names or labels recorded in the transcript (e.g., 'Speaker_001', 'Speaker_002', "
+        "or participant names). Never guess or invent real participant identities.\n"
+        "4. Understand conversational references (such as 'that task', 'the previous decision', 'who did that') "
+        "based on the previous questions and answers in this follow-up conversation.\n"
+        "5. Provide direct, concise, and helpful answers without generic chatbot filler.\n"
+    )
+
+
+def _answer_followup_question(agenda, summary, transcript_text, previous_messages, question):
+    system_prompt = _build_followup_system_prompt(agenda, summary, transcript_text)
+
+    messages = [{"role": "system", "content": system_prompt}]
+
+    # Bounded conversation memory: include up to the last 10 messages for context
+    history_slice = previous_messages[-10:] if len(previous_messages) > 10 else previous_messages
+    for msg in history_slice:
+        role = "user" if msg.message_by == "user" else "assistant"
+        messages.append({"role": role, "content": msg.content})
+
+    messages.append({"role": "user", "content": question})
+
+    return _call_hugging_face_chat(messages)
+
 
 
 def _summarize_transcript(agenda, transcript_text):
@@ -421,6 +462,9 @@ def SearchMeeting(request):
             "message": "Successfully joined meeting.",
             "ai_enabled": meeting.ai_enabled,
             "agenda": meeting.Agenda,
+            "summary": meeting.Summary or "",
+            "meeting_mode": meeting.meeting_mode,
+            "status": meeting.Status,
             "transcript": transcript,
         })
     except Meeting.DoesNotExist:
@@ -500,4 +544,189 @@ def UpdateTranscript(request, entry_id):
         "text": entry.text,
         "message": "Transcript entry updated.",
     })
+
+
+@api_view(["POST"])
+def AskFollowUpQuestion(request):
+    """
+    Accepts meeting_id and user question.
+    Verifies meeting existence, AI status, and presence of summary.
+    Constructs bounded conversation context and queries the AI model.
+    Persists user question and AI response atomically.
+    """
+    data = request.data
+    meeting_id = data.get("meeting_id")
+    question = (data.get("question") or "").strip()
+
+    if not meeting_id:
+        return Response({"success": False, "message": "Meeting ID is required."}, status=400)
+
+    if not question:
+        return Response({"success": False, "message": "Question cannot be empty."}, status=400)
+
+    try:
+        meeting = Meeting.objects.get(Meeting_id=meeting_id)
+    except (Meeting.DoesNotExist, ValueError):
+        return Response({"success": False, "message": "Meeting not found."}, status=404)
+
+    if not meeting.ai_enabled:
+        return Response({"success": False, "message": "AI is disabled for this meeting."}, status=400)
+
+    # Check if summary is available
+    if not meeting.Summary or not meeting.Summary.strip():
+        return Response({
+            "success": False,
+            "message": "Meeting summary is not yet available. Please generate the summary before asking follow-up questions.",
+        }, status=400)
+
+    # Retrieve transcript
+    entries = meeting.transcript_entries.order_by("timestamp")
+    transcript_text = _format_transcript_entries(entries)
+
+    # Retrieve existing follow-up messages for conversation memory
+    previous_messages = list(meeting.follow_up_messages.order_by("timestamp", "pk"))
+
+    # Generate answer from AI
+    try:
+        ai_reply = _answer_followup_question(
+            agenda=meeting.Agenda or "",
+            summary=meeting.Summary,
+            transcript_text=transcript_text,
+            previous_messages=previous_messages,
+            question=question,
+        )
+    except ValueError as exc:
+        return Response({"success": False, "message": str(exc) or "Invalid request."}, status=400)
+    except RuntimeError as exc:
+        msg = str(exc)
+        if msg == "HF_TOKEN is not configured":
+            return Response({"success": False, "message": "HF_TOKEN is not configured"}, status=400)
+        if msg == "Hugging Face rate limit exceeded":
+            return Response({"success": False, "message": "The Hugging Face service is rate limited. Please try again shortly."}, status=429)
+        if msg == "Unexpected Hugging Face response":
+            return Response({"success": False, "message": "The Hugging Face response was unexpected."}, status=502)
+        return Response({"success": False, "message": msg or "AI response could not be generated."}, status=502)
+    except PermissionError:
+        return Response({"success": False, "message": "Unable to authenticate with the Hugging Face Router."}, status=401)
+    except TimeoutError:
+        return Response({"success": False, "message": "The Hugging Face request timed out."}, status=504)
+    except ConnectionError:
+        return Response({"success": False, "message": "The Hugging Face model provider is temporarily unavailable."}, status=503)
+    except Exception as exc:
+        logger.exception("[FOLLOWUP] Unexpected error generating AI reply: %s", exc)
+        return Response({"success": False, "message": f"Unexpected error: {str(exc)}"}, status=500)
+
+    if not ai_reply:
+        return Response({"success": False, "message": "AI did not generate a response."}, status=502)
+
+    # Persist user question and AI response atomically
+    try:
+        with transaction.atomic():
+            user_msg = FollowUpMessage.objects.create(
+                meeting=meeting,
+                message_by="user",
+                content=question,
+            )
+            ai_msg = FollowUpMessage.objects.create(
+                meeting=meeting,
+                message_by="ai",
+                content=ai_reply,
+            )
+    except Exception as exc:
+        logger.exception("[FOLLOWUP] Database persistence error: %s", exc)
+        return Response({"success": False, "message": "Failed to persist conversation message."}, status=500)
+
+    return Response({
+        "success": True,
+        "message": "AI response generated successfully.",
+        "user_message": {
+            "id": user_msg.pk,
+            "meeting_id": str(meeting.Meeting_id),
+            "message_by": user_msg.message_by,
+            "content": user_msg.content,
+            "timestamp": user_msg.timestamp.isoformat(),
+        },
+        "ai_message": {
+            "id": ai_msg.pk,
+            "meeting_id": str(meeting.Meeting_id),
+            "message_by": ai_msg.message_by,
+            "content": ai_msg.content,
+            "timestamp": ai_msg.timestamp.isoformat(),
+        },
+    })
+
+
+@api_view(["GET"])
+def GetFollowUpHistory(request, meeting_id):
+    """
+    Returns the complete follow-up conversation history for a given meeting
+    in strict chronological order.
+    """
+    if not meeting_id:
+        return Response({"success": False, "message": "Meeting ID is required."}, status=400)
+
+    try:
+        meeting = Meeting.objects.get(Meeting_id=meeting_id)
+    except (Meeting.DoesNotExist, ValueError):
+        return Response({"success": False, "message": "Meeting not found."}, status=404)
+
+    messages = meeting.follow_up_messages.order_by("timestamp", "pk")
+    serialized = [
+        {
+            "id": m.pk,
+            "meeting_id": str(meeting.Meeting_id),
+            "message_by": m.message_by,
+            "content": m.content,
+            "timestamp": m.timestamp.isoformat(),
+        }
+        for m in messages
+    ]
+
+    return Response({
+        "success": True,
+        "meeting_id": str(meeting.Meeting_id),
+        "messages": serialized,
+    })
+
+
+@api_view(["GET"])
+def GetMeetingDetails(request, meeting_id):
+    """
+    Returns meeting details including summary, status, and transcript.
+    Used for restoring completed meeting view on reload.
+    """
+    if not meeting_id:
+        return Response({"success": False, "message": "Meeting ID is required."}, status=400)
+
+    try:
+        meeting = Meeting.objects.get(Meeting_id=meeting_id)
+    except (Meeting.DoesNotExist, ValueError):
+        return Response({"success": False, "message": "Meeting not found."}, status=404)
+
+    transcript = []
+    if meeting.ai_enabled:
+        entries = meeting.transcript_entries.order_by("timestamp")
+        transcript = [
+            {
+                "id": e.pk,
+                "speaker": e.speaker_name,
+                "speaker_id": e.speaker_id or "",
+                "text": e.text,
+                "timestamp": e.timestamp.isoformat(),
+            }
+            for e in entries
+        ]
+
+    return Response({
+        "success": True,
+        "meeting_id": str(meeting.Meeting_id),
+        "host_name": meeting.Host_name,
+        "agenda": meeting.Agenda,
+        "ai_enabled": meeting.ai_enabled,
+        "summary": meeting.Summary or "",
+        "meeting_mode": meeting.meeting_mode,
+        "status": meeting.Status,
+        "transcript": transcript,
+    })
+
 

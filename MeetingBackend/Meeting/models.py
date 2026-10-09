@@ -8,12 +8,13 @@ class Meeting(models.Model):
     Agenda = models.CharField(max_length=200)
     Created_at = models.DateTimeField(auto_now_add=True)
     Status = models.BooleanField(default=False)
+    meeting_mode = models.CharField(max_length=50, default="video")
     # AI Meeting Assistant — optional per-meeting feature
     ai_enabled = models.BooleanField(default=False)
     Summary = models.TextField(null=True, blank=True)
 
     def __str__(self):
-        return f"{self.Host_name} — {str(self.Meeting_id)[:8]}"
+        return f"{self.Host_name} [{self.meeting_mode}] — {str(self.Meeting_id)[:8]}"
 
 
 class TranscriptEntry(models.Model):
@@ -36,3 +37,29 @@ class TranscriptEntry(models.Model):
 
     def __str__(self):
         return f"[{self.speaker_name}] {self.text[:60]}"
+
+
+class FollowUpMessage(models.Model):
+    """
+    Persisted follow-up conversation messages (user questions and AI answers)
+    for a completed meeting session in both video and room meeting modes.
+    """
+    MESSAGE_BY_CHOICES = (
+        ("user", "User"),
+        ("ai", "AI"),
+    )
+
+    meeting = models.ForeignKey(
+        Meeting,
+        on_delete=models.CASCADE,
+        related_name="follow_up_messages",
+    )
+    message_by = models.CharField(max_length=10, choices=MESSAGE_BY_CHOICES)
+    content = models.TextField()
+    timestamp = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["timestamp", "pk"]
+
+    def __str__(self):
+        return f"[{str(self.meeting.Meeting_id)[:8]}] {self.message_by}: {self.content[:40]}"

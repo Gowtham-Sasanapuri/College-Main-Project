@@ -50,6 +50,7 @@ export function useWebRTC(meetingId, userName, initialAiEnabled = false) {
 
     // meetingAiEnabled — the server-confirmed value exposed to the UI.
     const [meetingAiEnabled, setMeetingAiEnabled] = useState(initialAiEnabled);
+    const [existingSummary, setExistingSummary] = useState('');
 
     // Transcript entries — populated for ALL participants when the meeting has AI on.
     const [transcriptEntries, setTranscriptEntries] = useState([]);
@@ -417,6 +418,10 @@ export function useWebRTC(meetingId, userName, initialAiEnabled = false) {
                     aiEnabledRef.current = serverAiEnabled;
                     setMeetingAiEnabled(serverAiEnabled);
 
+                    if (data.summary) {
+                        setExistingSummary(data.summary);
+                    }
+
                     // ── Decouple signaling from media acquisition ────────────
                     //
                     // tryGetLocalStream() is awaited BEFORE openSocket() so that:
@@ -463,6 +468,7 @@ export function useWebRTC(meetingId, userName, initialAiEnabled = false) {
         // Expose the server-confirmed flag so Meeting.jsx can drive all rendering
         // decisions from it instead of from location.state.aiEnabled
         meetingAiEnabled,
+        existingSummary,
         participantId: participantIdRef.current,
         isMeetingEnded,
     };

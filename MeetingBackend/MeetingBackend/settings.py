@@ -23,6 +23,12 @@ try:
 except ImportError:
     pass
 
+import logging
+_env_logger = logging.getLogger(__name__)
+_env_logger.info(f"[ENV] HF_TOKEN configured: {bool(os.getenv('HF_TOKEN'))}")
+_env_logger.info(f"[ENV] HF_MODEL configured: {bool(os.getenv('HF_MODEL'))}")
+
+
 
 
 # Quick-start development settings - unsuitable for production
