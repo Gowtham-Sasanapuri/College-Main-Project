@@ -588,3 +588,326 @@
     color: #94a3b8;
     font-style: italic;
 }
+
+/* ── Participant Setup Section (Room Meeting Mode) ────────────────── */
+.participantSetupSection {
+    background-color: rgba(15, 23, 42, 0.6);
+    border: 1px solid rgba(59, 130, 246, 0.25);
+    border-radius: 16px;
+    padding: 24px;
+    display: flex;
+    flex-direction: column;
+    gap: 18px;
+}
+
+.setupTitleGroup {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+.setupTitle {
+    font-size: 1rem;
+    font-weight: 700;
+    color: #93c5fd;
+    margin: 0;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.setupSubtitle {
+    font-size: 0.85rem;
+    color: #94a3b8;
+    margin: 0;
+}
+
+.countInputRow {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.questionLabel {
+    font-size: 0.92rem;
+    font-weight: 600;
+    color: #f1f5f9;
+}
+
+.countInput {
+    max-width: 180px;
+    background-color: #0f172a;
+    border: 1px solid #334155;
+    color: #ffffff;
+    padding: 10px 14px;
+    border-radius: 8px;
+    font-size: 1rem;
+    font-weight: 600;
+    outline: none;
+    transition: border-color 0.2s;
+}
+
+.countInput:focus {
+    border-color: #3b82f6;
+    box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.2);
+}
+
+.emailFieldsList {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    margin-top: 6px;
+    max-height: 280px;
+    overflow-y: auto;
+    padding-right: 6px;
+}
+
+.emailFieldsList::-webkit-scrollbar {
+    width: 6px;
+}
+
+.emailFieldsList::-webkit-scrollbar-thumb {
+    background: #334155;
+    border-radius: 4px;
+}
+
+.emailFieldItem {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.emailFieldItemLabel {
+    font-size: 0.82rem;
+    font-weight: 600;
+    color: #cbd5e1;
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
+}
+
+.emailInput {
+    width: 100%;
+    background-color: #0f172a;
+    border: 1px solid #334155;
+    color: #ffffff;
+    padding: 10px 14px;
+    border-radius: 8px;
+    font-size: 0.95rem;
+    outline: none;
+    transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+.emailInput:focus {
+    border-color: #3b82f6;
+    box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.2);
+}
+
+.emailInputError {
+    border-color: #ef4444 !important;
+}
+
+.fieldValidationMsg {
+    font-size: 0.8rem;
+    color: #f87171;
+    margin: 0;
+}
+
+.fieldWarningMsg {
+    font-size: 0.8rem;
+    color: #fbbf24;
+    margin: 0;
+}
+
+.setupActionsRow {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+    margin-top: 8px;
+}
+
+.saveSetupBtn {
+    background: linear-gradient(135deg, #2563eb, #1d4ed8);
+    color: #ffffff;
+    border: none;
+    padding: 10px 20px;
+    border-radius: 8px;
+    font-weight: 600;
+    cursor: pointer;
+    font-size: 0.9rem;
+    transition: all 0.2s;
+}
+
+.saveSetupBtn:hover:not(:disabled) {
+    background: linear-gradient(135deg, #3b82f6, #2563eb);
+    transform: translateY(-1px);
+}
+
+.saveSetupBtn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.editSetupBtn {
+    background: transparent;
+    border: 1px solid #475569;
+    color: #94a3b8;
+    padding: 10px 16px;
+    border-radius: 8px;
+    font-weight: 500;
+    cursor: pointer;
+    font-size: 0.85rem;
+    transition: all 0.2s;
+}
+
+.editSetupBtn:hover {
+    color: #fff;
+    border-color: #64748b;
+}
+
+.setupSavedBanner {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px 16px;
+    border-radius: 10px;
+    background: rgba(34, 197, 94, 0.12);
+    border: 1px solid rgba(34, 197, 94, 0.3);
+    color: #86efac;
+    font-size: 0.9rem;
+}
+
+/* ── Room Meeting Complete Report Actions ─────────────────────────── */
+.roomReportActionsCard {
+    background-color: rgba(15, 23, 42, 0.8);
+    border: 1px solid rgba(99, 102, 241, 0.25);
+    border-radius: 16px;
+    padding: 20px 24px;
+    margin-top: 24px;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+}
+
+.roomReportHeader {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 10px;
+}
+
+.roomReportTitle {
+    font-size: 1.05rem;
+    font-weight: 700;
+    color: #e0e7ff;
+    margin: 0;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.roomReportButtons {
+    display: flex;
+    gap: 12px;
+    flex-wrap: wrap;
+}
+
+.roomDownloadPdfBtn {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    background: #1e1b4b;
+    color: #e0e7ff;
+    border: 1px solid rgba(99, 102, 241, 0.5);
+    padding: 10px 18px;
+    border-radius: 10px;
+    font-weight: 600;
+    font-size: 0.9rem;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.roomDownloadPdfBtn:hover:not(:disabled) {
+    background: #312e81;
+    border-color: #818cf8;
+    transform: translateY(-1px);
+}
+
+.roomSendEmailBtn {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    background: linear-gradient(135deg, #4f46e5, #4338ca);
+    color: #ffffff;
+    border: none;
+    padding: 10px 18px;
+    border-radius: 10px;
+    font-weight: 600;
+    font-size: 0.9rem;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.roomSendEmailBtn:hover:not(:disabled) {
+    background: linear-gradient(135deg, #6366f1, #4f46e5);
+    transform: translateY(-1px);
+    box-shadow: 0 4px 14px rgba(79, 70, 229, 0.4);
+}
+
+.roomRecipientListBox {
+    background: #0b0f19;
+    border: 1px solid #1e293b;
+    border-radius: 10px;
+    padding: 14px 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.roomRecipientLabel {
+    font-size: 0.85rem;
+    color: #94a3b8;
+    margin: 0;
+}
+
+.roomRecipientTags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+.roomRecipientChip {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 5px 12px;
+    border-radius: 6px;
+    background: rgba(99, 102, 241, 0.15);
+    border: 1px solid rgba(99, 102, 241, 0.3);
+    color: #e0e7ff;
+    font-size: 0.85rem;
+    font-family: monospace;
+}
+
+.successAlert {
+    padding: 10px 14px;
+    border-radius: 8px;
+    background: rgba(34, 197, 94, 0.12);
+    border: 1px solid rgba(34, 197, 94, 0.3);
+    color: #86efac;
+    font-size: 0.9rem;
+    margin: 0;
+}
+
+.dangerAlert {
+    padding: 10px 14px;
+    border-radius: 8px;
+    background: rgba(239, 68, 68, 0.12);
+    border: 1px solid rgba(239, 68, 68, 0.3);
+    color: #fca5a5;
+    font-size: 0.9rem;
+    margin: 0;
+}
+

@@ -2,21 +2,24 @@ import { useState, useEffect } from 'react';
 import { useParams, useLocation } from 'react-router-dom';
 import { useWebRTC } from './hooks/useWebRTC';
 import { useTranscription } from './hooks/useTranscription';
+import { generateMeetingPdfReport } from '../utils/generatePdfReport';
 import VideoTile from './components/VideoTile';
 import ControlBar from './components/ControlBar';
 import TranscriptPanel from './components/TranscriptPanel';
 import FollowUpChat from './components/FollowUpChat';
 import styles from './Meeting.module.css';
 
+const API_BASE = 'http://127.0.0.1:8000';
+
 const Meeting = () => {
     const { id } = useParams();
     const location = useLocation();
 
     // `initialAiEnabled` is only a hint from the host's navigation state.
-    // Joiners arrive with `location.state = { name }` — no aiEnabled field.
+    // Joiners arrive with `location.state = { name, email }` — no aiEnabled field.
     // The authoritative value always comes from the server via useWebRTC's
     // JoinMeeting fetch and is returned as `meetingAiEnabled`.
-    const { name, aiEnabled: initialAiEnabled = false } = location.state || {};
+    const { name, email = '', aiEnabled: initialAiEnabled = false } = location.state || {};
 
     const {
         localVideoRef,
@@ -31,9 +34,10 @@ const Meeting = () => {
         sendTranscriptEntry,
         meetingAiEnabled,
         existingSummary,
+        registeredParticipants,
         participantId,
         isMeetingEnded,
-    } = useWebRTC(id, name, initialAiEnabled);
+    } = useWebRTC(id, name, email, initialAiEnabled);
 
     // Panel visibility — closed by default; opens automatically when the server
     // confirms AI is on for this meeting (works for both host and joiner).
@@ -47,6 +51,117 @@ const Meeting = () => {
     const [summaryReady, setSummaryReady] = useState(false);
     const [modalTab, setModalTab] = useState('summary'); // 'summary' | 'followup'
 
+    // Meeting report & email delivery states
+    const [isDownloadingPdf, setIsDownloadingPdf] = useState(false);
+    const [isSendingEmail, setIsSendingEmail] = useState(false);
+    const [showEmailReview, setShowEmailReview] = useState(false);
+    const [emailNotice, setEmailNotice] = useState({ type: '', message: '' });
+    const [currentParticipants, setCurrentParticipants] = useState([]);
+
+    // Keep participant list synchronized
+    useEffect(() => {
+        if (registeredParticipants && registeredParticipants.length > 0) {
+            setCurrentParticipants(registeredParticipants);
+        }
+    }, [registeredParticipants]);
+
+    // Fetch participant list when dialog opens
+    useEffect(() => {
+        if (endDialogOpen && id) {
+            fetch(`${API_BASE}/meeting/participants/${id}/`)
+                .then(r => r.ok ? r.json() : null)
+                .then(data => {
+                    if (data && data.success && Array.isArray(data.participants)) {
+                        setCurrentParticipants(data.participants);
+                    }
+                })
+                .catch(() => {});
+        }
+    }, [endDialogOpen, id]);
+
+    // Download complete PDF report (Summary + FollowUp messages + Metadata)
+    const handleDownloadReportPdf = async () => {
+        setIsDownloadingPdf(true);
+        try {
+            const res = await fetch(`${API_BASE}/meeting/report/${id}/`);
+            const data = await res.json();
+            if (res.ok && data.success) {
+                generateMeetingPdfReport({
+                    meetingId: id,
+                    agenda: data.agenda || '',
+                    hostName: data.host_name || '',
+                    meetingMode: 'video',
+                    createdAt: data.created_at || '',
+                    summary: data.summary || summaryText,
+                    followUpMessages: data.follow_up_messages || [],
+                    participants: data.participants || currentParticipants,
+                });
+            } else {
+                // Fallback to local state if report endpoint returned error
+                generateMeetingPdfReport({
+                    meetingId: id,
+                    agenda: '',
+                    hostName: name || 'Participant',
+                    meetingMode: 'video',
+                    createdAt: new Date().toISOString(),
+                    summary: summaryText,
+                    followUpMessages: [],
+                    participants: currentParticipants,
+                });
+            }
+        } catch (err) {
+            console.error('[REPORT_DOWNLOAD] Failed:', err);
+            // Fallback to local state
+            generateMeetingPdfReport({
+                meetingId: id,
+                agenda: '',
+                hostName: name || 'Participant',
+                meetingMode: 'video',
+                createdAt: new Date().toISOString(),
+                summary: summaryText,
+                followUpMessages: [],
+                participants: currentParticipants,
+            });
+        } finally {
+            setIsDownloadingPdf(false);
+        }
+    };
+
+    // Send report PDF to participant emails via backend Django service
+    const handleSendReportEmail = async () => {
+        setIsSendingEmail(true);
+        setEmailNotice({ type: '', message: '' });
+
+        try {
+            const res = await fetch(`${API_BASE}/meeting/send-report/`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ meeting_id: id }),
+            });
+            const data = await res.json();
+
+            if (res.ok && data.success) {
+                setEmailNotice({
+                    type: 'success',
+                    message: data.message || `Meeting report sent successfully to ${data.sent_count} recipient(s).`,
+                });
+            } else {
+                setEmailNotice({
+                    type: 'error',
+                    message: data.message || 'Failed to send meeting report emails.',
+                });
+            }
+        } catch (err) {
+            console.error('[SEND_EMAIL] Error:', err);
+            setEmailNotice({
+                type: 'error',
+                message: 'Network error: could not connect to server to send report emails.',
+            });
+        } finally {
+            setIsSendingEmail(false);
+        }
+    };
+
     // Synchronize existing summary if meeting was already summarized
     useEffect(() => {
         if (existingSummary && !summaryText) {
@@ -58,6 +173,7 @@ const Meeting = () => {
     // Live speech recognition
     const { stopRecognition } = useTranscription(
         meetingAiEnabled && !isMeetingEnded,
+
         audioEnabled,
         name,
         sendTranscriptEntry
@@ -298,6 +414,85 @@ const Meeting = () => {
                                 ) : modalTab === 'followup' ? (
                                     <>
                                         <FollowUpChat meetingId={id} meetingMode="video" isSummaryReady={true} />
+
+                                        {/* Meeting Report Actions (PDF Download & Email Delivery) */}
+                                        <div className={styles.reportSection}>
+                                            <h4 className={styles.reportSectionTitle}>
+                                                <span>📄</span> Meeting Report & PDF Delivery
+                                            </h4>
+
+                                            <div className={styles.reportButtonsRow}>
+                                                <button
+                                                    type="button"
+                                                    className={styles.downloadPdfButton}
+                                                    onClick={handleDownloadReportPdf}
+                                                    disabled={isDownloadingPdf}
+                                                >
+                                                    <span>{isDownloadingPdf ? '⏳ Generating PDF...' : '📥 Download Meeting Report PDF'}</span>
+                                                </button>
+
+                                                <button
+                                                    type="button"
+                                                    className={styles.sendEmailButton}
+                                                    onClick={() => setShowEmailReview(prev => !prev)}
+                                                    disabled={isSendingEmail}
+                                                >
+                                                    <span>✉️ Send Meeting Report to Participants</span>
+                                                </button>
+                                            </div>
+
+                                            {/* Recipient list review before sending */}
+                                            {showEmailReview && (
+                                                <div className={styles.recipientReviewBox}>
+                                                    <p className={styles.recipientReviewLabel}>
+                                                        Review participants who will receive the meeting report PDF:
+                                                    </p>
+
+                                                    {currentParticipants.length > 0 ? (
+                                                        <>
+                                                            <div className={styles.recipientListTags}>
+                                                                {currentParticipants.map((p, idx) => (
+                                                                    <span key={p.id || idx} className={styles.recipientTag}>
+                                                                        ✉ {p.name && p.name !== p.email ? `${p.name} (${p.email})` : p.email}
+                                                                    </span>
+                                                                ))}
+                                                            </div>
+
+                                                            <div style={{ marginTop: '8px', display: 'flex', gap: '8px', alignItems: 'center' }}>
+                                                                <button
+                                                                    type="button"
+                                                                    className={styles.sendEmailButton}
+                                                                    onClick={handleSendReportEmail}
+                                                                    disabled={isSendingEmail}
+                                                                    style={{ padding: '8px 14px', fontSize: '12px' }}
+                                                                >
+                                                                    {isSendingEmail ? 'Sending...' : 'Confirm & Send Report Now'}
+                                                                </button>
+                                                                <button
+                                                                    type="button"
+                                                                    className={styles.secondaryButton}
+                                                                    onClick={() => setShowEmailReview(false)}
+                                                                    style={{ padding: '8px 12px', fontSize: '12px' }}
+                                                                >
+                                                                    Cancel
+                                                                </button>
+                                                            </div>
+                                                        </>
+                                                    ) : (
+                                                        <div className={styles.recipientEmptyWarning}>
+                                                            ⚠️ No participant email addresses were collected for this meeting.
+                                                        </div>
+                                                    )}
+
+                                                    {emailNotice.message && (
+                                                        <div className={emailNotice.type === 'success' ? styles.reportSuccessNotice : styles.reportErrorNotice}>
+                                                            {emailNotice.type === 'success' ? '✓ ' : '✕ '} {emailNotice.message}
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            )}
+                                        </div>
+
                                         <div className={styles.modalActions}>
                                             <button
                                                 type="button"
@@ -314,6 +509,85 @@ const Meeting = () => {
                                 ) : (
                                     <>
                                         <pre className={styles.summaryText}>{summaryText}</pre>
+
+                                        {/* Meeting Report Actions (PDF Download & Email Delivery) */}
+                                        <div className={styles.reportSection}>
+                                            <h4 className={styles.reportSectionTitle}>
+                                                <span>📄</span> Meeting Report & PDF Delivery
+                                            </h4>
+
+                                            <div className={styles.reportButtonsRow}>
+                                                <button
+                                                    type="button"
+                                                    className={styles.downloadPdfButton}
+                                                    onClick={handleDownloadReportPdf}
+                                                    disabled={isDownloadingPdf}
+                                                >
+                                                    <span>{isDownloadingPdf ? '⏳ Generating PDF...' : '📥 Download Meeting Report PDF'}</span>
+                                                </button>
+
+                                                <button
+                                                    type="button"
+                                                    className={styles.sendEmailButton}
+                                                    onClick={() => setShowEmailReview(prev => !prev)}
+                                                    disabled={isSendingEmail}
+                                                >
+                                                    <span>✉️ Send Meeting Report to Participants</span>
+                                                </button>
+                                            </div>
+
+                                            {/* Recipient list review before sending */}
+                                            {showEmailReview && (
+                                                <div className={styles.recipientReviewBox}>
+                                                    <p className={styles.recipientReviewLabel}>
+                                                        Review participants who will receive the meeting report PDF:
+                                                    </p>
+
+                                                    {currentParticipants.length > 0 ? (
+                                                        <>
+                                                            <div className={styles.recipientListTags}>
+                                                                {currentParticipants.map((p, idx) => (
+                                                                    <span key={p.id || idx} className={styles.recipientTag}>
+                                                                        ✉ {p.name && p.name !== p.email ? `${p.name} (${p.email})` : p.email}
+                                                                    </span>
+                                                                ))}
+                                                            </div>
+
+                                                            <div style={{ marginTop: '8px', display: 'flex', gap: '8px', alignItems: 'center' }}>
+                                                                <button
+                                                                    type="button"
+                                                                    className={styles.sendEmailButton}
+                                                                    onClick={handleSendReportEmail}
+                                                                    disabled={isSendingEmail}
+                                                                    style={{ padding: '8px 14px', fontSize: '12px' }}
+                                                                >
+                                                                    {isSendingEmail ? 'Sending...' : 'Confirm & Send Report Now'}
+                                                                </button>
+                                                                <button
+                                                                    type="button"
+                                                                    className={styles.secondaryButton}
+                                                                    onClick={() => setShowEmailReview(false)}
+                                                                    style={{ padding: '8px 12px', fontSize: '12px' }}
+                                                                >
+                                                                    Cancel
+                                                                </button>
+                                                            </div>
+                                                        </>
+                                                    ) : (
+                                                        <div className={styles.recipientEmptyWarning}>
+                                                            ⚠️ No participant email addresses were collected for this meeting.
+                                                        </div>
+                                                    )}
+
+                                                    {emailNotice.message && (
+                                                        <div className={emailNotice.type === 'success' ? styles.reportSuccessNotice : styles.reportErrorNotice}>
+                                                            {emailNotice.type === 'success' ? '✓ ' : '✕ '} {emailNotice.message}
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            )}
+                                        </div>
+
                                         <div className={styles.modalActions}>
                                             <button
                                                 type="button"
@@ -329,6 +603,7 @@ const Meeting = () => {
                                     </>
                                 )}
                             </div>
+
                         ) : (
                             <div className={styles.modalBody}>
                                 <p className={styles.modalHint}>

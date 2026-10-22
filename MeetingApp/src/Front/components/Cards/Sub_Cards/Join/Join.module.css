@@ -225,3 +225,10 @@
         border-radius: 16px;
     }
 }
+
+.errorText {
+    font-family: 'Inter', sans-serif;
+    font-size: 0.8rem;
+    color: #f87171;
+    margin-top: 2px;
+}

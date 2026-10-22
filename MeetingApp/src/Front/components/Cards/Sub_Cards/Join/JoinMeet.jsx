@@ -7,19 +7,35 @@ import { useNavigate } from 'react-router-dom';
 const JoinMeet = ({ Join }) => {
     const nav = useNavigate();
     let [name, setName] = useState('');
+    let [email, setEmail] = useState('');
     let [MeetLink, setMeetLink] = useState('');
+    let [emailError, setEmailError] = useState('');
+
+    const validateEmailFormat = (val) => {
+        const regex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        return regex.test(val.trim());
+    };
 
     const handleJoin = () => {
         if (!name.trim()) {
             alert('Please enter your name');
             return;
         }
+        if (!email.trim()) {
+            setEmailError('Please enter your email address');
+            return;
+        }
+        if (!validateEmailFormat(email)) {
+            setEmailError('Please enter a valid email address (e.g. name@example.com)');
+            return;
+        }
+        setEmailError('');
         if (!MeetLink.trim()) {
             alert('Please enter a valid Meeting ID');
             return;
         }
         nav(`/Meeting/${MeetLink.trim()}`, {
-            state: { name: name.trim() },
+            state: { name: name.trim(), email: email.trim().toLowerCase() },
         });
     };
 
@@ -52,6 +68,20 @@ const JoinMeet = ({ Join }) => {
                 </div>
 
                 <div className={styles.NameContainer}>
+                    <label className={styles.FieldLabel}>Your Email (for meeting reports)</label>
+                    <input
+                        type="email"
+                        placeholder="e.g. yourname@example.com"
+                        value={email}
+                        onChange={(e) => {
+                            setEmail(e.target.value);
+                            if (emailError) setEmailError('');
+                        }}
+                    />
+                    {emailError && <span className={styles.errorText}>{emailError}</span>}
+                </div>
+
+                <div className={styles.NameContainer}>
                     <label className={styles.FieldLabel}>Meeting ID</label>
                     <input
                         type="text"
@@ -60,6 +90,7 @@ const JoinMeet = ({ Join }) => {
                         value={MeetLink}
                     />
                 </div>
+
 
                 <div className={styles.Quote}>
                     <p>💡 Tip: Make sure you have the exact meeting ID.</p>

@@ -1,5 +1,8 @@
 from rest_framework.decorators import api_view
 from rest_framework.response import Response
+from django.http import HttpResponse
+from django.core.validators import validate_email
+from django.core.exceptions import ValidationError
 from django.db import transaction
 from django.utils import timezone
 from asgiref.sync import async_to_sync
@@ -7,16 +10,83 @@ from channels.layers import get_channel_layer
 import logging
 import os
 import uuid
-import requests
-from .models import Meeting, TranscriptEntry, FollowUpMessage
+from google import genai
+from google.genai import types, errors
+from .models import Meeting, TranscriptEntry, FollowUpMessage, MeetingParticipant
+from .email_service import send_meeting_report_to_participants, validate_and_filter_emails
+from .report_generator import generate_meeting_pdf_bytes, sanitize_filename
 
 
 
-HF_ROUTER_ENDPOINT = "https://router.huggingface.co/v1/chat/completions"
-HF_MODEL = os.getenv("HF_MODEL", "Qwen/Qwen3-8B")
-HF_TIMEOUT_SECONDS = int(os.getenv("HF_TIMEOUT_SECONDS", "120"))
+GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-2.5-flash")
+GEMINI_TIMEOUT_SECONDS = int(os.getenv("GEMINI_TIMEOUT_SECONDS", "120"))
 
 logger = logging.getLogger(__name__)
+
+
+def _call_gemini_chat(contents, system_instruction=None):
+    gemini_api_key = os.environ.get("GEMINI_API_KEY")
+    logger.info("[GEMINI] key configured: %s", bool(gemini_api_key))
+
+    if not gemini_api_key:
+        logger.error("[GEMINI] GEMINI_API_KEY is not configured")
+        raise RuntimeError("GEMINI_API_KEY is not configured")
+
+    model_name = os.getenv("GEMINI_MODEL", GEMINI_MODEL)
+    logger.info("[GEMINI] model=%s", model_name)
+
+    logger.info("[GEMINI] sending request")
+    try:
+        client = genai.Client(api_key=gemini_api_key)
+        config = None
+        if system_instruction:
+            config = types.GenerateContentConfig(
+                system_instruction=system_instruction,
+            )
+        response = client.models.generate_content(
+            model=model_name,
+            contents=contents,
+            config=config,
+        )
+    except errors.APIError as exc:
+        code = getattr(exc, "code", None)
+        message = getattr(exc, "message", str(exc))
+        logger.error("[GEMINI] API error: code=%s message=%s", code, message)
+        if code in (401, 403):
+            raise PermissionError("Unable to authenticate with Google Gemini API.") from None
+        if code == 429:
+            raise RuntimeError("Gemini rate limit exceeded") from None
+        if code == 400:
+            raise ValueError(f"Gemini rejected request: {message}") from None
+        if code in (500, 502, 503, 504):
+            raise ConnectionError("Google Gemini model or service is temporarily unavailable") from None
+        raise RuntimeError(f"Unexpected Gemini API error: {code}") from None
+    except Exception as exc:
+        logger.error("[GEMINI] request failed: %s", exc)
+        exc_str = str(exc).lower()
+        if "timeout" in exc_str or "timed out" in exc_str:
+            raise TimeoutError("Gemini request timed out") from exc
+        if "connection" in exc_str or "unavailable" in exc_str:
+            raise ConnectionError("Gemini service is temporarily unavailable") from exc
+        raise RuntimeError(f"Unexpected error communicating with Gemini: {str(exc)}") from exc
+
+    if not response or not response.text:
+        logger.error("[GEMINI] response parsing failed: missing generated content")
+        raise RuntimeError("Unexpected Gemini response")
+
+    generated_text = response.text.strip()
+    if not generated_text:
+        logger.error("[GEMINI] response parsing failed: empty generated text")
+        raise RuntimeError("Unexpected Gemini response")
+
+    logger.info("[GEMINI] generated content received")
+    return generated_text
+
+
+def _call_gemini(prompt):
+    return _call_gemini_chat(
+        contents=[types.Content(role="user", parts=[types.Part.from_text(text=prompt)])]
+    )
 
 
 def _format_transcript_entries(entries):
@@ -69,92 +139,6 @@ def _build_prompt(agenda, transcript_text, chunk_summary=False):
     )
 
 
-def _extract_generated_text(payload):
-    if isinstance(payload, dict):
-        if "choices" in payload and payload["choices"]:
-            choice = payload["choices"][0]
-            if isinstance(choice, dict):
-                message = choice.get("message")
-                if isinstance(message, dict):
-                    return message.get("content", "").strip()
-                if isinstance(message, str):
-                    return message.strip()
-                return choice.get("text", "")
-    return ""
-
-
-def _call_hugging_face_chat(messages):
-    hf_token_configured = bool(os.environ.get("HF_TOKEN"))
-    logger.info("[HF] token configured: %s", hf_token_configured)
-
-    if not hf_token_configured:
-        logger.error("[HF] HF_TOKEN is not configured")
-        raise RuntimeError("HF_TOKEN is not configured")
-
-    hf_token = os.environ["HF_TOKEN"]
-    model_name = os.getenv("HF_MODEL", HF_MODEL)
-    logger.info("[HF] model=%s", model_name)
-
-    payload = {
-        "messages": messages,
-        "model": model_name,
-    }
-
-    logger.info("[HF] sending request")
-    try:
-        response = requests.post(
-            HF_ROUTER_ENDPOINT,
-            headers={"Authorization": f"Bearer {hf_token}"},
-            json=payload,
-            timeout=HF_TIMEOUT_SECONDS,
-        )
-    except requests.exceptions.Timeout as exc:
-        logger.error("[HF] request timed out: %s", exc)
-        raise TimeoutError("Hugging Face request timed out") from exc
-    except requests.exceptions.RequestException as exc:
-        logger.error("[HF] request failed: %s", exc)
-        raise ConnectionError("Hugging Face request failed") from exc
-
-    logger.info("[HF] response status=%s", response.status_code)
-    logger.info("[HF] response received")
-
-    if response.status_code != 200:
-        logger.error(
-            "Hugging Face error: status=%s body=%s",
-            response.status_code,
-            response.text[:1000]
-        )
-        status_code = response.status_code
-        if status_code in (401, 403):
-            raise PermissionError("Unable to authenticate with the Hugging Face Router.") from None
-        if status_code == 429:
-            raise RuntimeError("Hugging Face rate limit exceeded") from None
-        if status_code == 400:
-            raise ValueError(f"Hugging Face rejected request: {response.text[:200]}") from None
-        if status_code in (500, 502, 503, 504):
-            raise ConnectionError("Hugging Face model or provider is unavailable") from None
-        raise RuntimeError(f"Unexpected Hugging Face error status {status_code}") from None
-
-    logger.info("[HF] parsing response")
-    try:
-        response_payload = response.json()
-    except ValueError as exc:
-        logger.error("[HF] response parsing failed: invalid JSON payload")
-        raise RuntimeError("Unexpected Hugging Face response") from exc
-
-    generated_text = _extract_generated_text(response_payload)
-    if not generated_text:
-        logger.error("[HF] response parsing failed: missing generated content")
-        raise RuntimeError("Unexpected Hugging Face response")
-
-    logger.info("[HF] generated content received")
-    return generated_text.strip()
-
-
-def _call_hugging_face(prompt):
-    return _call_hugging_face_chat([{"role": "user", "content": prompt}])
-
-
 def _build_followup_system_prompt(agenda, summary, transcript_text):
     agenda_str = agenda.strip() if agenda and agenda.strip() else "No agenda provided."
     summary_str = summary.strip() if summary and summary.strip() else "No summary available."
@@ -183,17 +167,24 @@ def _build_followup_system_prompt(agenda, summary, transcript_text):
 def _answer_followup_question(agenda, summary, transcript_text, previous_messages, question):
     system_prompt = _build_followup_system_prompt(agenda, summary, transcript_text)
 
-    messages = [{"role": "system", "content": system_prompt}]
+    contents = []
 
     # Bounded conversation memory: include up to the last 10 messages for context
     history_slice = previous_messages[-10:] if len(previous_messages) > 10 else previous_messages
     for msg in history_slice:
-        role = "user" if msg.message_by == "user" else "assistant"
-        messages.append({"role": role, "content": msg.content})
+        role = "user" if msg.message_by == "user" else "model"
+        contents.append(types.Content(
+            role=role,
+            parts=[types.Part.from_text(text=msg.content)]
+        ))
 
-    messages.append({"role": "user", "content": question})
+    contents.append(types.Content(
+        role="user",
+        parts=[types.Part.from_text(text=question)]
+    ))
 
-    return _call_hugging_face_chat(messages)
+    return _call_gemini_chat(contents, system_instruction=system_prompt)
+
 
 
 
@@ -204,11 +195,11 @@ def _summarize_transcript(agenda, transcript_text):
 
     chunks = _chunk_transcript_lines(transcript_text.splitlines())
     if len(chunks) == 1:
-        return _call_hugging_face(_build_prompt(agenda, chunks[0], chunk_summary=False))
+        return _call_gemini(_build_prompt(agenda, chunks[0], chunk_summary=False))
 
     chunk_summaries = []
     for chunk in chunks:
-        summary = _call_hugging_face(_build_prompt(agenda, chunk, chunk_summary=True))
+        summary = _call_gemini(_build_prompt(agenda, chunk, chunk_summary=True))
         if summary:
             chunk_summaries.append(summary)
 
@@ -230,18 +221,19 @@ def _summarize_transcript(agenda, transcript_text):
         "4. Action Items\n"
         "5. Important Conclusions\n"
     )
-    return _call_hugging_face(final_prompt)
+    return _call_gemini(final_prompt)
 
 
 @api_view(["POST"])
 def CreateLink(request):
     data = request.data
-    host = data.get("name")
+    host = (data.get("name") or "").strip()
+    email = (data.get("email") or "").strip()
     agenda = data.get("Agenda", "")
     ai_enabled = bool(data.get("ai_enabled", False))
     meeting_id = uuid.uuid4()
 
-    Meeting.objects.create(
+    meeting = Meeting.objects.create(
         Meeting_id=meeting_id,
         Host_name=host,
         Agenda=agenda,
@@ -249,11 +241,23 @@ def CreateLink(request):
         ai_enabled=ai_enabled,
     )
 
+    if email:
+        try:
+            validate_email(email)
+            MeetingParticipant.objects.create(
+                meeting=meeting,
+                email=email.lower(),
+                name=host or email.lower(),
+            )
+        except ValidationError:
+            logger.warning("[CREATE_LINK] Invalid host email ignored: %s", email)
+
     return Response({
         "success": True,
         "meeting_id": meeting_id,
         "message": "Meeting id Created",
     })
+
 
 
 @api_view(["POST"])
@@ -336,29 +340,29 @@ def EndMeeting(request):
         except RuntimeError as exc:
             error_message = str(exc)
             logger.error("[END_MEETING] RuntimeError: %s", error_message)
-            if error_message == "HF_TOKEN is not configured":
+            if error_message == "GEMINI_API_KEY is not configured":
                 return Response({
                     "success": False,
                     "ended": True,
                     "summary_generated": False,
                     "ai_enabled": True,
-                    "message": "HF_TOKEN is not configured",
+                    "message": "GEMINI_API_KEY is not configured",
                 }, status=400)
-            if error_message == "Hugging Face rate limit exceeded":
+            if error_message == "Gemini rate limit exceeded":
                 return Response({
                     "success": False,
                     "ended": True,
                     "summary_generated": False,
                     "ai_enabled": True,
-                    "message": "The Hugging Face service is rate limited. Please try again shortly.",
+                    "message": "The Gemini service is rate limited. Please try again shortly.",
                 }, status=429)
-            if error_message == "Unexpected Hugging Face response":
+            if error_message == "Unexpected Gemini response":
                 return Response({
                     "success": False,
                     "ended": True,
                     "summary_generated": False,
                     "ai_enabled": True,
-                    "message": "The Hugging Face response was unexpected.",
+                    "message": "The Gemini response was unexpected.",
                 }, status=502)
             return Response({
                 "success": False,
@@ -374,7 +378,7 @@ def EndMeeting(request):
                 "ended": True,
                 "summary_generated": False,
                 "ai_enabled": True,
-                "message": "Unable to authenticate with the Hugging Face Router.",
+                "message": "Unable to authenticate with the Gemini API.",
             }, status=401)
         except TimeoutError as exc:
             logger.error("[END_MEETING] TimeoutError: %s", exc)
@@ -383,7 +387,7 @@ def EndMeeting(request):
                 "ended": True,
                 "summary_generated": False,
                 "ai_enabled": True,
-                "message": "The Hugging Face request timed out.",
+                "message": "The Gemini request timed out.",
             }, status=504)
         except ConnectionError as exc:
             logger.error("[END_MEETING] ConnectionError: %s", exc)
@@ -392,7 +396,7 @@ def EndMeeting(request):
                 "ended": True,
                 "summary_generated": False,
                 "ai_enabled": True,
-                "message": "The Hugging Face model provider is temporarily unavailable.",
+                "message": "The Gemini model provider is temporarily unavailable.",
             }, status=503)
         except Exception as exc:
             logger.exception("[END_MEETING] Unexpected exception in summary generation: %s", exc)
@@ -411,7 +415,7 @@ def EndMeeting(request):
                 "ended": True,
                 "summary_generated": False,
                 "ai_enabled": True,
-                "message": "The Hugging Face response did not include a summary.",
+                "message": "The Gemini response did not include a summary.",
             }, status=502)
 
         meeting.Summary = summary
@@ -439,8 +443,22 @@ def EndMeeting(request):
 def SearchMeeting(request):
     data = request.data
     meeting_id = data.get("id")
+    name = (data.get("name") or "").strip()
+    email = (data.get("email") or "").strip()
     try:
         meeting = Meeting.objects.get(Meeting_id=meeting_id)
+
+        # If email is provided, validate and associate participant with this meeting
+        if email:
+            try:
+                validate_email(email)
+                MeetingParticipant.objects.update_or_create(
+                    meeting=meeting,
+                    email=email.lower(),
+                    defaults={"name": name or email.lower()}
+                )
+            except ValidationError:
+                logger.warning("[JOIN_MEETING] Invalid email provided: %s", email)
 
         # Load existing transcript if AI is enabled (for late joiners)
         transcript = []
@@ -457,6 +475,11 @@ def SearchMeeting(request):
                 for e in entries
             ]
 
+        participants = [
+            {"id": p.pk, "email": p.email, "name": p.name}
+            for p in meeting.participants.all()
+        ]
+
         return Response({
             "success": True,
             "message": "Successfully joined meeting.",
@@ -466,6 +489,8 @@ def SearchMeeting(request):
             "meeting_mode": meeting.meeting_mode,
             "status": meeting.Status,
             "transcript": transcript,
+            "participants": participants,
+            "report_sent_at": meeting.report_sent_at.isoformat() if meeting.report_sent_at else None,
         })
     except Meeting.DoesNotExist:
         return Response({
@@ -599,19 +624,19 @@ def AskFollowUpQuestion(request):
         return Response({"success": False, "message": str(exc) or "Invalid request."}, status=400)
     except RuntimeError as exc:
         msg = str(exc)
-        if msg == "HF_TOKEN is not configured":
-            return Response({"success": False, "message": "HF_TOKEN is not configured"}, status=400)
-        if msg == "Hugging Face rate limit exceeded":
-            return Response({"success": False, "message": "The Hugging Face service is rate limited. Please try again shortly."}, status=429)
-        if msg == "Unexpected Hugging Face response":
-            return Response({"success": False, "message": "The Hugging Face response was unexpected."}, status=502)
+        if msg == "GEMINI_API_KEY is not configured":
+            return Response({"success": False, "message": "GEMINI_API_KEY is not configured"}, status=400)
+        if msg == "Gemini rate limit exceeded":
+            return Response({"success": False, "message": "The Gemini service is rate limited. Please try again shortly."}, status=429)
+        if msg == "Unexpected Gemini response":
+            return Response({"success": False, "message": "The Gemini response was unexpected."}, status=502)
         return Response({"success": False, "message": msg or "AI response could not be generated."}, status=502)
     except PermissionError:
-        return Response({"success": False, "message": "Unable to authenticate with the Hugging Face Router."}, status=401)
+        return Response({"success": False, "message": "Unable to authenticate with the Gemini API."}, status=401)
     except TimeoutError:
-        return Response({"success": False, "message": "The Hugging Face request timed out."}, status=504)
+        return Response({"success": False, "message": "The Gemini request timed out."}, status=504)
     except ConnectionError:
-        return Response({"success": False, "message": "The Hugging Face model provider is temporarily unavailable."}, status=503)
+        return Response({"success": False, "message": "The Gemini model provider is temporarily unavailable."}, status=503)
     except Exception as exc:
         logger.exception("[FOLLOWUP] Unexpected error generating AI reply: %s", exc)
         return Response({"success": False, "message": f"Unexpected error: {str(exc)}"}, status=500)
@@ -727,6 +752,213 @@ def GetMeetingDetails(request, meeting_id):
         "meeting_mode": meeting.meeting_mode,
         "status": meeting.Status,
         "transcript": transcript,
+        "participants": [
+            {"id": p.pk, "email": p.email, "name": p.name}
+            for p in meeting.participants.all()
+        ],
+        "report_sent_at": meeting.report_sent_at.isoformat() if meeting.report_sent_at else None,
     })
+
+
+@api_view(["POST"])
+def RegisterParticipant(request):
+    """
+    Register or update a participant for a meeting.
+    Validates email format. Avoids duplicate registrations.
+    """
+    data = request.data
+    meeting_id = data.get("meeting_id")
+    email = (data.get("email") or "").strip().lower()
+    name = (data.get("name") or "").strip()
+
+    if not meeting_id:
+        return Response({"success": False, "message": "Meeting ID is required."}, status=400)
+    if not email:
+        return Response({"success": False, "message": "Email address is required."}, status=400)
+
+    try:
+        validate_email(email)
+    except ValidationError:
+        return Response({"success": False, "message": "Please enter a valid email address."}, status=400)
+
+    try:
+        meeting = Meeting.objects.get(Meeting_id=meeting_id)
+    except (Meeting.DoesNotExist, ValueError):
+        return Response({"success": False, "message": "Meeting not found."}, status=404)
+
+    participant, created = MeetingParticipant.objects.update_or_create(
+        meeting=meeting,
+        email=email,
+        defaults={"name": name or email}
+    )
+
+    return Response({
+        "success": True,
+        "message": "Participant registered successfully.",
+        "participant": {
+            "id": participant.pk,
+            "email": participant.email,
+            "name": participant.name,
+            "created_at": participant.created_at.isoformat(),
+        }
+    })
+
+
+@api_view(["GET"])
+def GetMeetingParticipants(request, meeting_id):
+    """
+    Returns list of registered participants for a meeting.
+    """
+    if not meeting_id:
+        return Response({"success": False, "message": "Meeting ID is required."}, status=400)
+
+    try:
+        meeting = Meeting.objects.get(Meeting_id=meeting_id)
+    except (Meeting.DoesNotExist, ValueError):
+        return Response({"success": False, "message": "Meeting not found."}, status=404)
+
+    participants = [
+        {
+            "id": p.pk,
+            "email": p.email,
+            "name": p.name,
+            "created_at": p.created_at.isoformat(),
+        }
+        for p in meeting.participants.all()
+    ]
+
+    return Response({
+        "success": True,
+        "meeting_id": str(meeting.Meeting_id),
+        "participants": participants,
+    })
+
+
+@api_view(["GET"])
+def GetMeetingReportData(request, meeting_id):
+    """
+    Retrieves complete meeting report data:
+    - Metadata (ID, mode, host, agenda, created_at, report_sent_at)
+    - Summary
+    - Validated participants
+    - Complete chronological AI follow-up conversation
+    """
+    if not meeting_id:
+        return Response({"success": False, "message": "Meeting ID is required."}, status=400)
+
+    try:
+        meeting = Meeting.objects.get(Meeting_id=meeting_id)
+    except (Meeting.DoesNotExist, ValueError):
+        return Response({"success": False, "message": "Meeting not found."}, status=404)
+
+    participants = [
+        {
+            "id": p.pk,
+            "email": p.email,
+            "name": p.name,
+            "created_at": p.created_at.isoformat(),
+        }
+        for p in meeting.participants.all()
+    ]
+
+    messages = [
+        {
+            "id": m.pk,
+            "message_by": m.message_by,
+            "content": m.content,
+            "timestamp": m.timestamp.isoformat(),
+        }
+        for m in meeting.follow_up_messages.order_by("timestamp", "pk")
+    ]
+
+    return Response({
+        "success": True,
+        "meeting_id": str(meeting.Meeting_id),
+        "agenda": meeting.Agenda,
+        "host_name": meeting.Host_name,
+        "meeting_mode": meeting.meeting_mode,
+        "created_at": meeting.Created_at.isoformat() if meeting.Created_at else None,
+        "summary": meeting.Summary or "",
+        "ai_enabled": meeting.ai_enabled,
+        "report_sent_at": meeting.report_sent_at.isoformat() if meeting.report_sent_at else None,
+        "participants": participants,
+        "follow_up_messages": messages,
+    })
+
+
+@api_view(["POST"])
+def SendMeetingReport(request):
+    """
+    Generates meeting report PDF and emails it to all registered participants.
+    Validates meeting existence, presence of summary, and registered email addresses.
+    """
+    meeting_id = request.data.get("meeting_id")
+    if not meeting_id:
+        return Response({"success": False, "message": "Meeting ID is required."}, status=400)
+
+    try:
+        meeting = Meeting.objects.get(Meeting_id=meeting_id)
+    except (Meeting.DoesNotExist, ValueError):
+        return Response({"success": False, "message": "Meeting not found."}, status=404)
+
+    if not meeting.Summary or not meeting.Summary.strip():
+        return Response({
+            "success": False,
+            "message": "Meeting summary is not available yet. Please generate the summary before sending the report."
+        }, status=400)
+
+    participants = list(meeting.participants.all())
+    if not participants:
+        return Response({
+            "success": False,
+            "message": "No participant email addresses have been registered for this meeting."
+        }, status=400)
+
+    try:
+        result = send_meeting_report_to_participants(meeting)
+        return Response({
+            "success": True,
+            "message": f"Meeting report successfully sent to {result['sent_count']} participant(s).",
+            "recipients": result["recipients"],
+            "sent_count": result["sent_count"],
+            "report_sent_at": meeting.report_sent_at.isoformat() if meeting.report_sent_at else None,
+        })
+    except ValueError as val_err:
+        return Response({"success": False, "message": str(val_err)}, status=400)
+    except Exception as exc:
+        logger.exception("[SEND_REPORT] Failed to send meeting report: %s", exc)
+        return Response({
+            "success": False,
+            "message": f"Failed to deliver email: {str(exc)}"
+        }, status=502)
+
+
+@api_view(["GET"])
+def DownloadMeetingReport(request, meeting_id):
+    """
+    Generates and downloads the meeting report PDF.
+    Can be used directly or as backend fallback.
+    """
+    if not meeting_id:
+        return Response({"success": False, "message": "Meeting ID is required."}, status=400)
+
+    try:
+        meeting = Meeting.objects.get(Meeting_id=meeting_id)
+    except (Meeting.DoesNotExist, ValueError):
+        return Response({"success": False, "message": "Meeting not found."}, status=404)
+
+    if not meeting.Summary or not meeting.Summary.strip():
+        return Response({
+            "success": False,
+            "message": "Meeting summary is not available yet."
+        }, status=400)
+
+    pdf_bytes = generate_meeting_pdf_bytes(meeting)
+    filename = sanitize_filename(meeting.Meeting_id)
+
+    response = HttpResponse(pdf_bytes, content_type="application/pdf")
+    response["Content-Disposition"] = f'attachment; filename="{filename}"'
+    return response
+
 
 

@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useParams, useLocation, useNavigate } from 'react-router-dom';
 import FollowUpChat from './components/FollowUpChat';
+import { generateMeetingPdfReport } from '../utils/generatePdfReport';
 import styles from './RoomMeeting.module.css';
 
 const API_BASE = 'http://127.0.0.1:8000';
@@ -17,9 +18,27 @@ const RoomMeeting = () => {
     const [agenda, setAgenda] = useState(initialAgenda);
     const [aiEnabled, setAiEnabled] = useState(initialAiEnabled);
 
+    // Participant setup before recording starts
+    const [participantCount, setParticipantCount] = useState('3');
+    const [participantEmails, setParticipantEmails] = useState(['', '', '']);
+    const [emailErrors, setEmailErrors] = useState({});
+    const [setupCountError, setSetupCountError] = useState('');
+    const [setupDuplicateWarning, setSetupDuplicateWarning] = useState('');
+    const [isSetupSaved, setIsSetupSaved] = useState(false);
+    const [isSavingSetup, setIsSavingSetup] = useState(false);
+    const [setupError, setSetupError] = useState('');
+    const [setupSuccess, setSetupSuccess] = useState('');
+    const [savedParticipants, setSavedParticipants] = useState([]);
+
+    // Report download and email delivery states
+    const [isDownloadingPdf, setIsDownloadingPdf] = useState(false);
+    const [isSendingEmail, setIsSendingEmail] = useState(false);
+    const [reportSendNotice, setReportSendNotice] = useState({ type: '', message: '' });
+
     // Mic & Recording states
     const [micPermissionError, setMicPermissionError] = useState('');
     const [isRecording, setIsRecording] = useState(false);
+
 
     // Audio recording refs
     const mediaRecorderRef = useRef(null);
@@ -60,6 +79,12 @@ const RoomMeeting = () => {
                 if (data && data.success) {
                     if (data.ai_enabled !== undefined) setAiEnabled(data.ai_enabled);
                     if (data.agenda) setAgenda(data.agenda);
+                    if (data.participants && data.participants.length > 0) {
+                        setSavedParticipants(data.participants);
+                        setParticipantCount(String(data.participants.length));
+                        setParticipantEmails(data.participants.map(p => p.email));
+                        setIsSetupSaved(true);
+                    }
                     if (data.transcript && data.transcript.length > 0) {
                         setTranscript(data.transcript);
                     }
@@ -79,11 +104,231 @@ const RoomMeeting = () => {
             });
     }, [id]);
 
+    const validateEmailFormat = (val) => {
+        const regex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        return regex.test(String(val).trim());
+    };
+
+    const handleCountChange = (e) => {
+        const val = e.target.value;
+        setParticipantCount(val);
+        setIsSetupSaved(false);
+        setSetupSuccess('');
+        setSetupError('');
+
+        const num = parseInt(val, 10);
+        if (!val.trim()) {
+            setSetupCountError('Please enter a participant count between 1 and 50.');
+            return;
+        }
+
+        if (isNaN(num) || num <= 0) {
+            setSetupCountError('Please enter a valid positive number for expected participant count (1–50).');
+            return;
+        }
+
+        if (num > 50) {
+            setSetupCountError('Maximum allowed participant count is 50.');
+            return;
+        }
+
+        setSetupCountError('');
+
+        setParticipantEmails((prev) => {
+            const updated = [...prev];
+            if (num > prev.length) {
+                while (updated.length < num) updated.push('');
+            } else if (num < prev.length) {
+                return updated.slice(0, num);
+            }
+            return updated;
+        });
+    };
+
+    const handleEmailChange = (index, val) => {
+        setIsSetupSaved(false);
+        setSetupSuccess('');
+        setSetupError('');
+        setSetupDuplicateWarning('');
+
+        const updated = [...participantEmails];
+        updated[index] = val;
+        setParticipantEmails(updated);
+
+        setEmailErrors((prev) => {
+            const copy = { ...prev };
+            delete copy[index];
+            return copy;
+        });
+    };
+
+    const handleSaveParticipantSetup = async () => {
+        setSetupError('');
+        setSetupSuccess('');
+        setSetupCountError('');
+        setSetupDuplicateWarning('');
+
+        const count = parseInt(participantCount, 10);
+        if (isNaN(count) || count <= 0) {
+            setSetupCountError('Please enter a valid positive number for expected participant count (1–50).');
+            return;
+        }
+        if (count > 50) {
+            setSetupCountError('Maximum allowed participant count is 50.');
+            return;
+        }
+
+        const newErrors = {};
+        const seen = new Set();
+        const trimmedEmails = [];
+        let hasDuplicate = false;
+
+        for (let i = 0; i < count; i++) {
+            const email = (participantEmails[i] || '').trim().toLowerCase();
+            if (!email) {
+                newErrors[i] = 'Email address cannot be empty.';
+            } else if (!validateEmailFormat(email)) {
+                newErrors[i] = 'Invalid email address format.';
+            } else if (seen.has(email)) {
+                newErrors[i] = `Duplicate email address: ${email}`;
+                hasDuplicate = true;
+            } else {
+                seen.add(email);
+            }
+            trimmedEmails.push(email);
+        }
+
+        if (hasDuplicate) {
+            setSetupDuplicateWarning('Warning: duplicate recipient emails detected.');
+        }
+
+        if (Object.keys(newErrors).length > 0) {
+            setEmailErrors(newErrors);
+            setSetupError('Please fix the highlighted email address errors before saving.');
+            return;
+        }
+
+        setEmailErrors({});
+        setIsSavingSetup(true);
+
+        try {
+            const res = await fetch(`${API_BASE}/roomMeeting/participants/`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    meeting_id: id,
+                    participant_count: count,
+                    emails: trimmedEmails,
+                }),
+            });
+            const data = await res.json();
+            if (res.ok && data.success) {
+                setIsSetupSaved(true);
+                setSavedParticipants(data.participants || []);
+                setSetupSuccess(`✓ ${count} participant email(s) successfully saved!`);
+            } else {
+                setSetupError(data.message || 'Failed to save participant emails.');
+            }
+        } catch (err) {
+            console.error('[ROOM_PARTICIPANTS] Save failed:', err);
+            setSetupError('Network error: unable to save participants to server.');
+        } finally {
+            setIsSavingSetup(false);
+        }
+    };
+
+    // Report actions for Room Meeting (Download PDF & Send Email)
+    const handleDownloadRoomReportPdf = async () => {
+        setIsDownloadingPdf(true);
+        try {
+            const res = await fetch(`${API_BASE}/roomMeeting/report/${id}/`);
+            const data = await res.json();
+            if (res.ok && data.success) {
+                generateMeetingPdfReport({
+                    meetingId: id,
+                    agenda: data.agenda || agenda,
+                    hostName: data.host_name || name,
+                    meetingMode: 'room',
+                    createdAt: data.created_at || '',
+                    summary: data.summary || summary,
+                    followUpMessages: data.follow_up_messages || [],
+                    participants: data.participants || savedParticipants,
+                });
+            } else {
+                generateMeetingPdfReport({
+                    meetingId: id,
+                    agenda: agenda,
+                    hostName: name,
+                    meetingMode: 'room',
+                    createdAt: new Date().toISOString(),
+                    summary: summary,
+                    followUpMessages: [],
+                    participants: savedParticipants,
+                });
+            }
+        } catch (err) {
+            console.error('[ROOM_REPORT_DOWNLOAD] Failed:', err);
+            generateMeetingPdfReport({
+                meetingId: id,
+                agenda: agenda,
+                hostName: name,
+                meetingMode: 'room',
+                createdAt: new Date().toISOString(),
+                summary: summary,
+                followUpMessages: [],
+                participants: savedParticipants,
+            });
+        } finally {
+            setIsDownloadingPdf(false);
+        }
+    };
+
+    const handleSendRoomReportEmail = async () => {
+        setIsSendingEmail(true);
+        setReportSendNotice({ type: '', message: '' });
+
+        try {
+            const res = await fetch(`${API_BASE}/roomMeeting/send-report/`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ meeting_id: id }),
+            });
+            const data = await res.json();
+            if (res.ok && data.success) {
+                setReportSendNotice({
+                    type: 'success',
+                    message: data.message || `Meeting report successfully sent to ${data.sent_count} participant(s)!`,
+                });
+            } else {
+                setReportSendNotice({
+                    type: 'error',
+                    message: data.message || 'Failed to deliver report emails.',
+                });
+            }
+        } catch (err) {
+            console.error('[ROOM_SEND_EMAIL] Error:', err);
+            setReportSendNotice({
+                type: 'error',
+                message: 'Network error: could not connect to server to send report emails.',
+            });
+        } finally {
+            setIsSendingEmail(false);
+        }
+    };
+
     // 1. Request microphone permission & start recording
     const handleStartRecording = async () => {
         setMicPermissionError('');
+        setSetupError('');
+
+        if (!isSetupSaved) {
+            setSetupError('Please configure and save the expected recipient emails before starting the recording.');
+            return;
+        }
+
         try {
             const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+
             mediaStreamRef.current = stream;
 
             audioChunksRef.current = [];
@@ -304,6 +549,96 @@ const RoomMeeting = () => {
                             </div>
                         </div>
 
+                        {/* Participant Setup Step */}
+                        <div className={styles.participantSetupSection}>
+                            <div className={styles.setupTitleGroup}>
+                                <h3 className={styles.setupTitle}>👥 Participant Report Setup</h3>
+                                <p className={styles.setupSubtitle}>Configure who will receive the meeting report PDF after the session.</p>
+                            </div>
+
+                            {isSetupSaved ? (
+                                <div className={styles.setupSavedBanner}>
+                                    <div>
+                                        <strong>✓ Participants Configured ({savedParticipants.length}):</strong>
+                                        <div style={{ marginTop: '4px', fontSize: '0.85rem' }}>
+                                            {savedParticipants.map(p => p.email).join(', ')}
+                                        </div>
+                                    </div>
+                                    <button 
+                                        type="button" 
+                                        className={styles.editSetupBtn}
+                                        onClick={() => setIsSetupSaved(false)}
+                                    >
+                                        Edit List
+                                    </button>
+                                </div>
+                            ) : (
+                                <>
+                                    <div className={styles.countInputRow}>
+                                        <label className={styles.questionLabel} htmlFor="participant-count-input">
+                                            How many participants should receive this meeting report?
+                                        </label>
+                                        <input
+                                            id="participant-count-input"
+                                            type="number"
+                                            min="1"
+                                            max="50"
+                                            className={styles.countInput}
+                                            value={participantCount}
+                                            onChange={handleCountChange}
+                                            placeholder="e.g. 3"
+                                        />
+                                    </div>
+
+                                    {setupCountError && (
+                                        <p className={styles.fieldValidationMsg}>{setupCountError}</p>
+                                    )}
+
+                                    {participantEmails.length > 0 && (
+                                        <div className={styles.emailFieldsList}>
+                                            {participantEmails.map((email, idx) => (
+                                                <div key={idx} className={styles.emailFieldItem}>
+                                                    <label className={styles.emailFieldItemLabel} htmlFor={`participant-email-${idx}`}>
+                                                        Participant {idx + 1} email:
+                                                    </label>
+                                                    <input
+                                                        id={`participant-email-${idx}`}
+                                                        type="email"
+                                                        className={`${styles.emailInput} ${emailErrors[idx] ? styles.emailInputError : ''}`}
+                                                        value={email}
+                                                        placeholder={`participant${idx + 1}@example.com`}
+                                                        onChange={(e) => handleEmailChange(idx, e.target.value)}
+                                                    />
+                                                    {emailErrors[idx] && (
+                                                        <p className={styles.fieldValidationMsg}>{emailErrors[idx]}</p>
+                                                    )}
+                                                </div>
+                                            ))}
+                                        </div>
+                                    )}
+
+                                    {setupDuplicateWarning && (
+                                        <p className={styles.fieldWarningMsg}>{setupDuplicateWarning}</p>
+                                    )}
+
+                                    {setupError && (
+                                        <p className={styles.fieldValidationMsg}>{setupError}</p>
+                                    )}
+
+                                    <div className={styles.setupActionsRow}>
+                                        <button
+                                            type="button"
+                                            className={styles.saveSetupBtn}
+                                            onClick={handleSaveParticipantSetup}
+                                            disabled={isSavingSetup}
+                                        >
+                                            {isSavingSetup ? 'Saving Recipients...' : 'Save Recipient List'}
+                                        </button>
+                                    </div>
+                                </>
+                            )}
+                        </div>
+
                         {micPermissionError && (
                             <div className={styles.errorAlert}>
                                 <p>{micPermissionError}</p>
@@ -404,7 +739,7 @@ const RoomMeeting = () => {
                             {aiEnabled && (
                                 <div className={`${styles.progressStep} ${processingStep >= 5 ? styles.stepDone : processingStep === 4 ? styles.stepActive : styles.stepPending}`}>
                                     <span className={styles.stepIcon}>{processingStep >= 5 ? '✓' : processingStep === 4 ? '●' : '○'}</span>
-                                    <span>Generating meeting summary (Qwen 2.5 7B)</span>
+                                    <span>Generating meeting summary (Gemini)</span>
                                 </div>
                             )}
                         </div>
@@ -520,7 +855,7 @@ const RoomMeeting = () => {
                         {activeTab === 'summary' && aiEnabled && (
                             <div className={styles.summaryContainer}>
                                 <div className={styles.summaryHeaderBar}>
-                                    <h3 className={styles.sectionTitle}>AI Meeting Summary (Qwen 2.5 7B)</h3>
+                                    <h3 className={styles.sectionTitle}>AI Meeting Summary (Gemini)</h3>
                                     <button
                                         className={styles.regenBtn}
                                         onClick={handleRegenerateSummary}
@@ -548,6 +883,62 @@ const RoomMeeting = () => {
                                 <FollowUpChat meetingId={id} meetingMode="room" isSummaryReady={!!summary} />
                             </div>
                         )}
+
+                        {/* Report Actions Card */}
+                        <div className={styles.roomReportActionsCard}>
+                            <div className={styles.roomReportHeader}>
+                                <div>
+                                    <h3 className={styles.roomReportTitle}>📄 Meeting Report & Distribution</h3>
+                                    <p className={styles.subtitle} style={{ margin: 0, fontSize: '0.85rem' }}>
+                                        Export or distribute the official meeting report with AI summary and follow-up conversation.
+                                    </p>
+                                </div>
+                                <div className={styles.roomReportButtons}>
+                                    <button
+                                        type="button"
+                                        className={styles.roomDownloadPdfBtn}
+                                        onClick={handleDownloadRoomReportPdf}
+                                        disabled={isDownloadingPdf}
+                                    >
+                                        {isDownloadingPdf ? 'Generating PDF...' : '⬇ Download Meeting Report PDF'}
+                                    </button>
+                                    <button
+                                        type="button"
+                                        className={styles.roomSendEmailBtn}
+                                        onClick={handleSendRoomReportEmail}
+                                        disabled={isSendingEmail || savedParticipants.length === 0}
+                                        title={savedParticipants.length === 0 ? 'No recipient emails configured' : 'Send PDF to participants'}
+                                    >
+                                        {isSendingEmail ? 'Sending Emails...' : '✉ Send Meeting Report to Participants'}
+                                    </button>
+                                </div>
+                            </div>
+
+                            {/* Recipient review */}
+                            <div className={styles.roomRecipientListBox}>
+                                <p className={styles.roomRecipientLabel}>
+                                    <strong>Configured Recipients ({savedParticipants.length}):</strong>
+                                    {savedParticipants.length === 0
+                                        ? ' No recipient emails were configured before recording.'
+                                        : ' The report will be delivered individually to:'}
+                                </p>
+                                {savedParticipants.length > 0 && (
+                                    <div className={styles.roomRecipientTags}>
+                                        {savedParticipants.map((p, idx) => (
+                                            <span key={idx} className={styles.roomRecipientChip}>
+                                                ✉ {p.email}
+                                            </span>
+                                        ))}
+                                    </div>
+                                )}
+                            </div>
+
+                            {reportSendNotice.message && (
+                                <p className={reportSendNotice.type === 'success' ? styles.successAlert : styles.dangerAlert}>
+                                    {reportSendNotice.message}
+                                </p>
+                            )}
+                        </div>
                     </div>
                 )}
             </main>

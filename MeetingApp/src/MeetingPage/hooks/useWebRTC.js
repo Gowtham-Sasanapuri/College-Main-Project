@@ -13,6 +13,7 @@ const ICE_SERVERS = {
  *
  * @param {string}  meetingId        - The meeting room ID from the URL
  * @param {string}  userName         - The local participant's display name
+ * @param {string}  userEmail        - The local participant's email address
  * @param {boolean} initialAiEnabled - Hint from location.state (host only).
  *                                     The authoritative value always comes from
  *                                     the JoinMeeting API response and is stored
@@ -20,7 +21,7 @@ const ICE_SERVERS = {
  *                                     WS onmessage closure without re-creating it.
  * @returns hook state and controls
  */
-export function useWebRTC(meetingId, userName, initialAiEnabled = false) {
+export function useWebRTC(meetingId, userName, userEmail = '', initialAiEnabled = false) {
     const navigate = useNavigate();
 
     // ── Refs (stable across renders) ──────────────────────────────────
@@ -42,11 +43,13 @@ export function useWebRTC(meetingId, userName, initialAiEnabled = false) {
     const aiEnabledRef = useRef(initialAiEnabled);
 
     // ── State (drives re-render) ───────────────────────────────────────
-    const [remoteStreams,    setRemoteStreams]    = useState([]);
-    const [participants,     setParticipants]     = useState([]);
-    const [videoEnabled,     setVideoEnabled]     = useState(true);
-    const [audioEnabled,     setAudioEnabled]     = useState(true);
-    const [connectionStatus, setConnectionStatus] = useState('connecting');
+    const [remoteStreams,           setRemoteStreams]           = useState([]);
+    const [participants,            setParticipants]            = useState([]);
+    const [registeredParticipants,  setRegisteredParticipants]  = useState([]);
+    const [videoEnabled,            setVideoEnabled]            = useState(true);
+    const [audioEnabled,            setAudioEnabled]            = useState(true);
+    const [connectionStatus,        setConnectionStatus]        = useState('connecting');
+
 
     // meetingAiEnabled — the server-confirmed value exposed to the UI.
     const [meetingAiEnabled, setMeetingAiEnabled] = useState(initialAiEnabled);
@@ -394,13 +397,17 @@ export function useWebRTC(meetingId, userName, initialAiEnabled = false) {
         fetch('http://127.0.0.1:8000/JoinMeeting/', {
             method:  'POST',
             headers: { 'Content-Type': 'application/json' },
-            body:    JSON.stringify({ id: meetingId }),
+            body:    JSON.stringify({ id: meetingId, name: userName, email: userEmail }),
         })
             .then(r => r.json())
             .then(data => {
                 if (!data.success) {
                     navigate(-1);
                 } else {
+                    if (Array.isArray(data.participants)) {
+                        setRegisteredParticipants(data.participants);
+                    }
+
                     // ── FIX: set the runtime AI flag from the server response ──
                     //
                     // The server (models.py Meeting.ai_enabled) is the single source
@@ -469,9 +476,11 @@ export function useWebRTC(meetingId, userName, initialAiEnabled = false) {
         // decisions from it instead of from location.state.aiEnabled
         meetingAiEnabled,
         existingSummary,
+        registeredParticipants,
         participantId: participantIdRef.current,
         isMeetingEnded,
     };
 }
+
 
 

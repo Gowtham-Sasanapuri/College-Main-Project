@@ -8,6 +8,7 @@ import { useNavigate } from 'react-router-dom';
 const CreateCard = ({ Create }) => {
     const nav = useNavigate();
     const [name, setName] = useState('');
+    const [email, setEmail] = useState('');
     const [Agenda, setAgenda] = useState('');
     const [aiEnabled, setAiEnabled] = useState(false);
     const btn = useRef(null);
@@ -22,9 +23,10 @@ const CreateCard = ({ Create }) => {
         fetch('http://127.0.0.1:8000/createLink/', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ name, Agenda, ai_enabled: aiEnabled }),
+            body: JSON.stringify({ name, email: email.trim().toLowerCase(), Agenda, ai_enabled: aiEnabled }),
         })
             .then(response => response.json())
+
             .then(data => {
                 if (data.success) {
                     setId(data.meeting_id);
@@ -70,6 +72,16 @@ const CreateCard = ({ Create }) => {
                 </div>
 
                 <div className={styles.NameContainer}>
+                    <label className={styles.FieldLabel}>Your Email (optional / for meeting reports)</label>
+                    <input
+                        type="email"
+                        placeholder="e.g. yourname@example.com"
+                        value={email}
+                        onChange={(e) => setEmail(e.target.value)}
+                    />
+                </div>
+
+                <div className={styles.NameContainer}>
                     <label className={styles.FieldLabel}>Meeting Agenda (optional)</label>
                     <textarea
                         placeholder="What is this meeting about?"
@@ -78,6 +90,7 @@ const CreateCard = ({ Create }) => {
                         maxLength={200}
                     />
                 </div>
+
 
                 {/* ── AI Meeting Assistant opt-in ─────────────────────── */}
                 <div className={`${styles.AiCard} ${aiEnabled ? styles.AiCardActive : ''}`}>
@@ -151,12 +164,13 @@ const CreateCard = ({ Create }) => {
                             className={styles.Meet}
                             onClick={() =>
                                 nav(`/Meeting/${meeting_id}`, {
-                                    state: { name, aiEnabled },
+                                    state: { name, email, aiEnabled },
                                 })
                             }
                         >
                             Enter Meeting →
                         </button>
+
                     </div>
                 )}
             </div>

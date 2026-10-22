@@ -323,10 +323,16 @@ class MyConsumer(AsyncWebsocketConsumer):
 
     @database_sync_to_async
     def _cleanup_meeting_if_empty(self, meeting_id):
-        """Clean up the meeting record when all participants have left."""
+        """Clean up the meeting record when all participants have left, unless it has a summary or persisted AI data."""
         from .models import Meeting
         try:
-            Meeting.objects.filter(Meeting_id=meeting_id).delete()
-            print(f"[CLEANUP] Meeting {meeting_id} deleted (0 participants remaining).")
+            m = Meeting.objects.filter(Meeting_id=meeting_id).first()
+            if m:
+                # Do not delete meetings that have a summary, AI enabled, or follow-up messages
+                if m.Summary or m.ai_enabled or m.follow_up_messages.exists() or m.participants.exists():
+                    print(f"[CLEANUP] Meeting {meeting_id} preserved (has summary/AI/participants).")
+                    return
+                m.delete()
+                print(f"[CLEANUP] Meeting {meeting_id} deleted (0 participants remaining).")
         except Exception as exc:
             print(f"[CLEANUP] Error deleting meeting {meeting_id}: {exc}")

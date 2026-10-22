@@ -83,7 +83,7 @@ const CreateRoomCard = ({ Create }) => {
                         </div>
                         <div className={styles.AiTitleGroup}>
                             <span className={styles.AiTitle}>AI Meeting Assistant</span>
-                            <span className={styles.AiBeta}>Qwen 2.5 7B</span>
+                            <span className={styles.AiBeta}>Gemini</span>
                         </div>
                         <label className={styles.Toggle} htmlFor="ai-room-toggle" aria-label="Enable AI Meeting Assistant">
                             <input
@@ -111,7 +111,7 @@ const CreateRoomCard = ({ Create }) => {
                         </div>
                         <div className={styles.AiFeatureItem}>
                             <span className={styles.AiFeatureDot} />
-                            <span>Automatic Hugging Face Qwen 2.5 7B summary</span>
+                            <span>Automatic Google Gemini meeting summary</span>
                         </div>
                     </div>
 

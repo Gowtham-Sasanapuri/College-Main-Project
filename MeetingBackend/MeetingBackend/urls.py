@@ -41,5 +41,22 @@ urlpatterns = [
     path("roomMeeting/followup/", room_views.AskRoomFollowUpQuestion),
     path("roomMeeting/followup/<str:meeting_id>/", room_views.GetRoomFollowUpHistory),
     path("roomMeeting/details/<str:meeting_id>/", room_views.GetRoomMeetingDetails),
+
+    # Participant Management endpoints
+    path("meeting/participants/", views.RegisterParticipant),
+    path("meeting/participants/<str:meeting_id>/", views.GetMeetingParticipants),
+    path("roomMeeting/participants/", room_views.SetupRoomParticipants),
+    path("roomMeeting/participants/<str:meeting_id>/", room_views.GetRoomParticipants),
+
+    # Report Data & PDF Download endpoints
+    path("meeting/report/<str:meeting_id>/", views.GetMeetingReportData),
+    path("meeting/download-report/<str:meeting_id>/", views.DownloadMeetingReport),
+    path("roomMeeting/report/<str:meeting_id>/", room_views.GetRoomMeetingReportData),
+    path("roomMeeting/download-report/<str:meeting_id>/", room_views.DownloadRoomMeetingReport),
+
+    # Email Delivery endpoints
+    path("meeting/send-report/", views.SendMeetingReport),
+    path("roomMeeting/send-report/", room_views.SendRoomMeetingReport),
 ]
+
 

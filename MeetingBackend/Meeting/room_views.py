@@ -4,15 +4,21 @@ import logging
 import tempfile
 from rest_framework.decorators import api_view
 from rest_framework.response import Response
+from django.core.validators import validate_email
+from django.core.exceptions import ValidationError
 
-from .models import Meeting, TranscriptEntry
+from .models import Meeting, TranscriptEntry, MeetingParticipant
 from .audio_processor import process_audio_file
 from .views import (
     _format_transcript_entries,
     _summarize_transcript,
     AskFollowUpQuestion,
     GetFollowUpHistory,
+    SendMeetingReport,
+    GetMeetingReportData,
+    DownloadMeetingReport,
 )
+
 
 logger = logging.getLogger(__name__)
 
@@ -206,7 +212,7 @@ GetRoomFollowUpHistory = GetFollowUpHistory
 @api_view(["GET"])
 def GetRoomMeetingDetails(request, meeting_id):
     """
-    Retrieve room meeting details, transcript, summary, and status for restoring view on page reload.
+    Retrieve room meeting details, transcript, summary, participants, and status for restoring view on page reload.
     """
     if not meeting_id:
         return Response({"success": False, "message": "Meeting ID is required."}, status=400)
@@ -223,6 +229,15 @@ def GetRoomMeetingDetails(request, meeting_id):
             }
             for e in entries
         ]
+        participants = [
+            {
+                "id": p.pk,
+                "email": p.email,
+                "name": p.name,
+                "created_at": p.created_at.isoformat(),
+            }
+            for p in meeting.participants.all()
+        ]
         return Response({
             "success": True,
             "meeting_id": str(meeting.Meeting_id),
@@ -233,7 +248,138 @@ def GetRoomMeetingDetails(request, meeting_id):
             "meeting_mode": meeting.meeting_mode,
             "status": meeting.Status,
             "transcript": transcript,
+            "participants": participants,
+            "report_sent_at": meeting.report_sent_at.isoformat() if meeting.report_sent_at else None,
         })
     except (Meeting.DoesNotExist, ValueError):
         return Response({"success": False, "message": "Room meeting not found."}, status=404)
+
+
+@api_view(["POST"])
+def SetupRoomParticipants(request):
+    """
+    Saves the expected participant count and email addresses for an in-person Room Meeting.
+    Validates count, email format, and checks for duplicates.
+    Persists participants against the Room Meeting session.
+    """
+    data = request.data
+    meeting_id = data.get("meeting_id")
+    participant_count = data.get("participant_count")
+    emails = data.get("emails", [])
+
+    if not meeting_id:
+        return Response({"success": False, "message": "Meeting ID is required."}, status=400)
+
+    try:
+        meeting = Meeting.objects.get(Meeting_id=meeting_id)
+    except (Meeting.DoesNotExist, ValueError):
+        return Response({"success": False, "message": "Room meeting not found."}, status=404)
+
+    # Validate count
+    try:
+        count = int(participant_count)
+        if count <= 0:
+            return Response({"success": False, "message": "Participant count must be at least 1."}, status=400)
+        if count > 50:
+            return Response({"success": False, "message": "Participant count cannot exceed 50."}, status=400)
+    except (TypeError, ValueError):
+        return Response({"success": False, "message": "Please enter a valid positive number for participant count."}, status=400)
+
+    # Validate emails list length
+    if not isinstance(emails, list) or len(emails) != count:
+        return Response({
+            "success": False,
+            "message": f"Expected exactly {count} email address(es), but received {len(emails) if isinstance(emails, list) else 0}."
+        }, status=400)
+
+    # Validate each email and check for duplicates
+    cleaned_emails = []
+    seen = set()
+
+    for idx, raw_email in enumerate(emails, start=1):
+        email_str = (raw_email or "").strip().lower()
+        if not email_str:
+            return Response({
+                "success": False,
+                "message": f"Participant {idx} email cannot be empty."
+            }, status=400)
+
+        try:
+            validate_email(email_str)
+        except ValidationError:
+            return Response({
+                "success": False,
+                "message": f"Participant {idx} ('{email_str}') is not a valid email address."
+            }, status=400)
+
+        if email_str in seen:
+            return Response({
+                "success": False,
+                "message": f"Duplicate email address detected: '{email_str}'."
+            }, status=400)
+
+        seen.add(email_str)
+        cleaned_emails.append(email_str)
+
+    # Persist validated recipients for this room meeting
+    meeting.participants.all().delete()
+
+    created_objs = []
+    for idx, email in enumerate(cleaned_emails, start=1):
+        p = MeetingParticipant.objects.create(
+            meeting=meeting,
+            email=email,
+            name=f"Participant {idx}",
+        )
+        created_objs.append({
+            "id": p.pk,
+            "email": p.email,
+            "name": p.name,
+            "created_at": p.created_at.isoformat(),
+        })
+
+    logger.info(f"[ROOM_PARTICIPANTS] Saved {len(created_objs)} participants for room meeting {meeting_id}")
+
+    return Response({
+        "success": True,
+        "message": f"{len(created_objs)} participant email(s) saved successfully.",
+        "participants": created_objs,
+    })
+
+
+@api_view(["GET"])
+def GetRoomParticipants(request, meeting_id):
+    """
+    Returns list of saved participants for a room meeting.
+    """
+    if not meeting_id:
+        return Response({"success": False, "message": "Meeting ID is required."}, status=400)
+
+    try:
+        meeting = Meeting.objects.get(Meeting_id=meeting_id)
+    except (Meeting.DoesNotExist, ValueError):
+        return Response({"success": False, "message": "Room meeting not found."}, status=404)
+
+    participants = [
+        {
+            "id": p.pk,
+            "email": p.email,
+            "name": p.name,
+            "created_at": p.created_at.isoformat(),
+        }
+        for p in meeting.participants.all()
+    ]
+
+    return Response({
+        "success": True,
+        "meeting_id": str(meeting.Meeting_id),
+        "participants": participants,
+    })
+
+
+# Room Meeting Report & Email endpoints (aliases to shared service)
+SendRoomMeetingReport = SendMeetingReport
+GetRoomMeetingReportData = GetMeetingReportData
+DownloadRoomMeetingReport = DownloadMeetingReport
+
 
