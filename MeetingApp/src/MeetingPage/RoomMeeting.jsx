@@ -18,16 +18,7 @@ const RoomMeeting = () => {
     const [agenda, setAgenda] = useState(initialAgenda);
     const [aiEnabled, setAiEnabled] = useState(initialAiEnabled);
 
-    // Participant setup before recording starts
-    const [participantCount, setParticipantCount] = useState('3');
-    const [participantEmails, setParticipantEmails] = useState(['', '', '']);
-    const [emailErrors, setEmailErrors] = useState({});
-    const [setupCountError, setSetupCountError] = useState('');
-    const [setupDuplicateWarning, setSetupDuplicateWarning] = useState('');
-    const [isSetupSaved, setIsSetupSaved] = useState(false);
-    const [isSavingSetup, setIsSavingSetup] = useState(false);
-    const [setupError, setSetupError] = useState('');
-    const [setupSuccess, setSetupSuccess] = useState('');
+    // Automatically identified participants from audio processing
     const [savedParticipants, setSavedParticipants] = useState([]);
 
     // Report download and email delivery states
@@ -38,7 +29,6 @@ const RoomMeeting = () => {
     // Mic & Recording states
     const [micPermissionError, setMicPermissionError] = useState('');
     const [isRecording, setIsRecording] = useState(false);
-
 
     // Audio recording refs
     const mediaRecorderRef = useRef(null);
@@ -81,9 +71,6 @@ const RoomMeeting = () => {
                     if (data.agenda) setAgenda(data.agenda);
                     if (data.participants && data.participants.length > 0) {
                         setSavedParticipants(data.participants);
-                        setParticipantCount(String(data.participants.length));
-                        setParticipantEmails(data.participants.map(p => p.email));
-                        setIsSetupSaved(true);
                     }
                     if (data.transcript && data.transcript.length > 0) {
                         setTranscript(data.transcript);
@@ -103,139 +90,6 @@ const RoomMeeting = () => {
                 console.warn('[ROOM] Could not restore room meeting details:', err);
             });
     }, [id]);
-
-    const validateEmailFormat = (val) => {
-        const regex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-        return regex.test(String(val).trim());
-    };
-
-    const handleCountChange = (e) => {
-        const val = e.target.value;
-        setParticipantCount(val);
-        setIsSetupSaved(false);
-        setSetupSuccess('');
-        setSetupError('');
-
-        const num = parseInt(val, 10);
-        if (!val.trim()) {
-            setSetupCountError('Please enter a participant count between 1 and 50.');
-            return;
-        }
-
-        if (isNaN(num) || num <= 0) {
-            setSetupCountError('Please enter a valid positive number for expected participant count (1–50).');
-            return;
-        }
-
-        if (num > 50) {
-            setSetupCountError('Maximum allowed participant count is 50.');
-            return;
-        }
-
-        setSetupCountError('');
-
-        setParticipantEmails((prev) => {
-            const updated = [...prev];
-            if (num > prev.length) {
-                while (updated.length < num) updated.push('');
-            } else if (num < prev.length) {
-                return updated.slice(0, num);
-            }
-            return updated;
-        });
-    };
-
-    const handleEmailChange = (index, val) => {
-        setIsSetupSaved(false);
-        setSetupSuccess('');
-        setSetupError('');
-        setSetupDuplicateWarning('');
-
-        const updated = [...participantEmails];
-        updated[index] = val;
-        setParticipantEmails(updated);
-
-        setEmailErrors((prev) => {
-            const copy = { ...prev };
-            delete copy[index];
-            return copy;
-        });
-    };
-
-    const handleSaveParticipantSetup = async () => {
-        setSetupError('');
-        setSetupSuccess('');
-        setSetupCountError('');
-        setSetupDuplicateWarning('');
-
-        const count = parseInt(participantCount, 10);
-        if (isNaN(count) || count <= 0) {
-            setSetupCountError('Please enter a valid positive number for expected participant count (1–50).');
-            return;
-        }
-        if (count > 50) {
-            setSetupCountError('Maximum allowed participant count is 50.');
-            return;
-        }
-
-        const newErrors = {};
-        const seen = new Set();
-        const trimmedEmails = [];
-        let hasDuplicate = false;
-
-        for (let i = 0; i < count; i++) {
-            const email = (participantEmails[i] || '').trim().toLowerCase();
-            if (!email) {
-                newErrors[i] = 'Email address cannot be empty.';
-            } else if (!validateEmailFormat(email)) {
-                newErrors[i] = 'Invalid email address format.';
-            } else if (seen.has(email)) {
-                newErrors[i] = `Duplicate email address: ${email}`;
-                hasDuplicate = true;
-            } else {
-                seen.add(email);
-            }
-            trimmedEmails.push(email);
-        }
-
-        if (hasDuplicate) {
-            setSetupDuplicateWarning('Warning: duplicate recipient emails detected.');
-        }
-
-        if (Object.keys(newErrors).length > 0) {
-            setEmailErrors(newErrors);
-            setSetupError('Please fix the highlighted email address errors before saving.');
-            return;
-        }
-
-        setEmailErrors({});
-        setIsSavingSetup(true);
-
-        try {
-            const res = await fetch(`${API_BASE}/roomMeeting/participants/`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    meeting_id: id,
-                    participant_count: count,
-                    emails: trimmedEmails,
-                }),
-            });
-            const data = await res.json();
-            if (res.ok && data.success) {
-                setIsSetupSaved(true);
-                setSavedParticipants(data.participants || []);
-                setSetupSuccess(`✓ ${count} participant email(s) successfully saved!`);
-            } else {
-                setSetupError(data.message || 'Failed to save participant emails.');
-            }
-        } catch (err) {
-            console.error('[ROOM_PARTICIPANTS] Save failed:', err);
-            setSetupError('Network error: unable to save participants to server.');
-        } finally {
-            setIsSavingSetup(false);
-        }
-    };
 
     // Report actions for Room Meeting (Download PDF & Send Email)
     const handleDownloadRoomReportPdf = async () => {
@@ -319,14 +173,13 @@ const RoomMeeting = () => {
     // 1. Request microphone permission & start recording
     const handleStartRecording = async () => {
         setMicPermissionError('');
-        setSetupError('');
-
-        if (!isSetupSaved) {
-            setSetupError('Please configure and save the expected recipient emails before starting the recording.');
-            return;
-        }
 
         try {
+            if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+                setMicPermissionError('Your browser does not support audio recording or microphone access is restricted.');
+                return;
+            }
+
             const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
 
             mediaStreamRef.current = stream;
@@ -349,6 +202,11 @@ const RoomMeeting = () => {
                 }
             };
 
+            recorder.onerror = (event) => {
+                console.error('[ROOM] MediaRecorder error:', event);
+                setMicPermissionError('Audio recording encountered an unexpected error.');
+            };
+
             mediaRecorderRef.current = recorder;
             recorder.start(500); // chunk every 500ms into memory array accumulator
 
@@ -356,7 +214,11 @@ const RoomMeeting = () => {
             setMeetingState('RECORDING');
         } catch (err) {
             console.error('Microphone access denied/error:', err);
-            setMicPermissionError('Microphone permission is required to record this meeting.');
+            const errMsg =
+                err?.name === 'NotAllowedError' || err?.name === 'PermissionDeniedError'
+                    ? 'Microphone permission was denied. Please allow microphone access in your browser settings to record this meeting.'
+                    : (err?.message || 'Microphone permission is required to record this meeting.');
+            setMicPermissionError(errMsg);
         }
     };
 
@@ -421,6 +283,19 @@ const RoomMeeting = () => {
                 setProcessingStep(5);
                 setTranscript(data.transcript || []);
                 setSummary(data.summary || '');
+                if (data.participants && data.participants.length > 0) {
+                    setSavedParticipants(data.participants);
+                } else if (data.transcript) {
+                    const autoP = [];
+                    const seen = new Set();
+                    data.transcript.forEach((t) => {
+                        if (t.email && !seen.has(t.email)) {
+                            seen.add(t.email);
+                            autoP.push({ email: t.email, name: t.speaker });
+                        }
+                    });
+                    setSavedParticipants(autoP);
+                }
                 setMeetingState('COMPLETE');
             } else {
                 setProcessingError(data.message || 'Failed to process room meeting audio.');
@@ -499,6 +374,9 @@ const RoomMeeting = () => {
         }
     };
 
+    // Dynamically derive unique speakers from actual diarized/identified transcript
+    const uniqueSpeakers = [...new Set(transcript.map((t) => t.speaker))];
+
     return (
         <div className={styles.page}>
             {/* Header */}
@@ -549,94 +427,16 @@ const RoomMeeting = () => {
                             </div>
                         </div>
 
-                        {/* Participant Setup Step */}
-                        <div className={styles.participantSetupSection}>
-                            <div className={styles.setupTitleGroup}>
-                                <h3 className={styles.setupTitle}>👥 Participant Report Setup</h3>
-                                <p className={styles.setupSubtitle}>Configure who will receive the meeting report PDF after the session.</p>
-                            </div>
-
-                            {isSetupSaved ? (
-                                <div className={styles.setupSavedBanner}>
-                                    <div>
-                                        <strong>✓ Participants Configured ({savedParticipants.length}):</strong>
-                                        <div style={{ marginTop: '4px', fontSize: '0.85rem' }}>
-                                            {savedParticipants.map(p => p.email).join(', ')}
-                                        </div>
-                                    </div>
-                                    <button 
-                                        type="button" 
-                                        className={styles.editSetupBtn}
-                                        onClick={() => setIsSetupSaved(false)}
-                                    >
-                                        Edit List
-                                    </button>
-                                </div>
-                            ) : (
-                                <>
-                                    <div className={styles.countInputRow}>
-                                        <label className={styles.questionLabel} htmlFor="participant-count-input">
-                                            How many participants should receive this meeting report?
-                                        </label>
-                                        <input
-                                            id="participant-count-input"
-                                            type="number"
-                                            min="1"
-                                            max="50"
-                                            className={styles.countInput}
-                                            value={participantCount}
-                                            onChange={handleCountChange}
-                                            placeholder="e.g. 3"
-                                        />
-                                    </div>
-
-                                    {setupCountError && (
-                                        <p className={styles.fieldValidationMsg}>{setupCountError}</p>
-                                    )}
-
-                                    {participantEmails.length > 0 && (
-                                        <div className={styles.emailFieldsList}>
-                                            {participantEmails.map((email, idx) => (
-                                                <div key={idx} className={styles.emailFieldItem}>
-                                                    <label className={styles.emailFieldItemLabel} htmlFor={`participant-email-${idx}`}>
-                                                        Participant {idx + 1} email:
-                                                    </label>
-                                                    <input
-                                                        id={`participant-email-${idx}`}
-                                                        type="email"
-                                                        className={`${styles.emailInput} ${emailErrors[idx] ? styles.emailInputError : ''}`}
-                                                        value={email}
-                                                        placeholder={`participant${idx + 1}@example.com`}
-                                                        onChange={(e) => handleEmailChange(idx, e.target.value)}
-                                                    />
-                                                    {emailErrors[idx] && (
-                                                        <p className={styles.fieldValidationMsg}>{emailErrors[idx]}</p>
-                                                    )}
-                                                </div>
-                                            ))}
-                                        </div>
-                                    )}
-
-                                    {setupDuplicateWarning && (
-                                        <p className={styles.fieldWarningMsg}>{setupDuplicateWarning}</p>
-                                    )}
-
-                                    {setupError && (
-                                        <p className={styles.fieldValidationMsg}>{setupError}</p>
-                                    )}
-
-                                    <div className={styles.setupActionsRow}>
-                                        <button
-                                            type="button"
-                                            className={styles.saveSetupBtn}
-                                            onClick={handleSaveParticipantSetup}
-                                            disabled={isSavingSetup}
-                                        >
-                                            {isSavingSetup ? 'Saving Recipients...' : 'Save Recipient List'}
-                                        </button>
-                                    </div>
-                                </>
-                            )}
+                        {/* Automatic Identification Info Banner */}
+                        <div className={styles.autoInfoCard}>
+                            <h4 className={styles.autoInfoTitle}>
+                                <span>🎙️</span> Automatic Speaker Identification & Diarization Active
+                            </h4>
+                            <p className={styles.autoInfoDesc}>
+                                Place this central device in the room. Participants do not need to register or enter emails.
+                                When the meeting ends, Whisper ASR and Pyannote diarization will automatically transcribe speech and
+                                match voices against registered participant profiles in Pinecone.
+                            </p>
                         </div>
 
                         {micPermissionError && (
@@ -792,17 +592,60 @@ const RoomMeeting = () => {
                         {/* Transcript Tab */}
                         {activeTab === 'transcript' && (
                             <div className={styles.transcriptContainer}>
-                                <h3 className={styles.sectionTitle}>Meeting Transcript</h3>
+                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+                                    <h3 className={styles.sectionTitle} style={{ margin: 0 }}>Meeting Transcript</h3>
+                                    {transcript.length > 0 && (
+                                        <span style={{ fontSize: '0.85rem', color: '#94a3b8' }}>
+                                            {uniqueSpeakers.length} speaker{uniqueSpeakers.length !== 1 ? 's' : ''} detected
+                                        </span>
+                                    )}
+                                </div>
+
+                                {transcript.length > 0 && (
+                                    <div className={styles.speakerSummaryBar}>
+                                        <span className={styles.speakerSummaryLabel}>
+                                            Diarized Speakers ({uniqueSpeakers.length}):
+                                        </span>
+                                        {uniqueSpeakers.map((spk, idx) => {
+                                            const item = transcript.find((t) => t.speaker === spk);
+                                            const isId = Boolean(item && (item.email || item.is_identified));
+                                            return (
+                                                <span
+                                                    key={idx}
+                                                    className={isId ? styles.detectedSpeakerChipIdentified : styles.detectedSpeakerChip}
+                                                >
+                                                    {isId ? '✓ ' : '○ '}
+                                                    <strong>{spk}</strong>
+                                                    {item?.email && <span style={{ opacity: 0.85, fontSize: '0.75rem' }}>({item.email})</span>}
+                                                </span>
+                                            );
+                                        })}
+                                    </div>
+                                )}
+
                                 {transcript.length === 0 ? (
                                     <p className={styles.emptyText}>No speech detected in this meeting recording.</p>
                                 ) : (
                                     <div className={styles.entryList}>
                                         {transcript.map((entry) => {
                                             const isEditing = editingId === entry.id;
+                                            const isId = Boolean(entry.email || entry.is_identified);
                                             return (
                                                 <div key={entry.id} className={styles.transcriptCard}>
                                                     <div className={styles.entryHeader}>
-                                                        <span className={styles.speakerTag}>{entry.speaker}</span>
+                                                        <div className={isId ? styles.speakerTagIdentified : styles.speakerTag}>
+                                                            <strong className={styles.speakerName}>{entry.speaker}</strong>
+                                                            {entry.email && (
+                                                                <span className={styles.speakerEmail}>
+                                                                    ({entry.email})
+                                                                </span>
+                                                            )}
+                                                            {isId && (
+                                                                <span className={styles.verifiedBadge} title="Identified via voice profile matching">
+                                                                    ✓ Verified
+                                                                </span>
+                                                            )}
+                                                        </div>
                                                         {!isEditing && (
                                                             <button
                                                                 className={styles.pencilEditBtn}
@@ -907,7 +750,7 @@ const RoomMeeting = () => {
                                         className={styles.roomSendEmailBtn}
                                         onClick={handleSendRoomReportEmail}
                                         disabled={isSendingEmail || savedParticipants.length === 0}
-                                        title={savedParticipants.length === 0 ? 'No recipient emails configured' : 'Send PDF to participants'}
+                                        title={savedParticipants.length === 0 ? 'No registered participant emails were identified' : 'Send PDF to identified participants'}
                                     >
                                         {isSendingEmail ? 'Sending Emails...' : '✉ Send Meeting Report to Participants'}
                                     </button>
@@ -917,16 +760,16 @@ const RoomMeeting = () => {
                             {/* Recipient review */}
                             <div className={styles.roomRecipientListBox}>
                                 <p className={styles.roomRecipientLabel}>
-                                    <strong>Configured Recipients ({savedParticipants.length}):</strong>
+                                    <strong>Identified Participants ({savedParticipants.length}):</strong>
                                     {savedParticipants.length === 0
-                                        ? ' No recipient emails were configured before recording.'
-                                        : ' The report will be delivered individually to:'}
+                                        ? ' No registered participants were confidently identified from the audio recording.'
+                                        : ' The report will be delivered automatically to:'}
                                 </p>
                                 {savedParticipants.length > 0 && (
                                     <div className={styles.roomRecipientTags}>
                                         {savedParticipants.map((p, idx) => (
                                             <span key={idx} className={styles.roomRecipientChip}>
-                                                ✉ {p.email}
+                                                ✉ {p.name ? `${p.name} (${p.email})` : p.email}
                                             </span>
                                         ))}
                                     </div>

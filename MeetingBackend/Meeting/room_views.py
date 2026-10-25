@@ -89,18 +89,37 @@ def ProcessRoomAudio(request):
         meeting.transcript_entries.all().delete()
 
         db_entries = []
+        identified_participants = {}
+
         for item in structured_entries:
             entry = TranscriptEntry.objects.create(
                 meeting=meeting,
                 speaker_name=item["speaker"],
+                speaker_id=item.get("email") or item.get("speaker_id") or "",
                 text=item["text"]
             )
+            if item.get("is_identified") and item.get("email"):
+                identified_participants[item["email"]] = item["speaker"]
+
             db_entries.append({
                 "id": entry.pk,
                 "speaker": entry.speaker_name,
+                "speaker_id": entry.speaker_id or "",
+                "email": item.get("email"),
+                "anonymous_speaker": item.get("anonymous_speaker", entry.speaker_name),
+                "is_identified": item.get("is_identified", False),
+                "confidence": item.get("confidence", 0.0),
                 "text": entry.text,
                 "timestamp": entry.timestamp.isoformat()
             })
+
+        # Automatically register identified participants for report delivery
+        for p_email, p_name in identified_participants.items():
+            MeetingParticipant.objects.get_or_create(
+                meeting=meeting,
+                email=p_email,
+                defaults={"name": p_name}
+            )
 
         summary_text = ""
         summary_generated = False
@@ -120,6 +139,10 @@ def ProcessRoomAudio(request):
             "success": True,
             "meeting_id": str(meeting.Meeting_id),
             "transcript": db_entries,
+            "participants": [
+                {"id": p.pk, "email": p.email, "name": p.name}
+                for p in meeting.participants.all()
+            ],
             "ai_enabled": meeting.ai_enabled,
             "summary_generated": summary_generated,
             "summary": summary_text,
@@ -224,6 +247,9 @@ def GetRoomMeetingDetails(request, meeting_id):
             {
                 "id": e.pk,
                 "speaker": e.speaker_name,
+                "speaker_id": e.speaker_id or "",
+                "email": e.speaker_id if ("@" in (e.speaker_id or "")) else None,
+                "is_identified": bool("@" in (e.speaker_id or "")),
                 "text": e.text,
                 "timestamp": e.timestamp.isoformat(),
             }

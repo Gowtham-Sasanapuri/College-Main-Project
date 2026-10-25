@@ -329,7 +329,27 @@ def process_audio_file(audio_path, hf_token=None):
             "Speaker diarization produced no speaker segments. Please ensure the audio contains audible speech."
         )
 
+    # Pre-populate anonymous speaker mapping for all diarization turns
     speaker_mapping = {}
+    for turn in diar_turns:
+        normalize_speaker_label(turn["speaker"], speaker_mapping)
+
+    # 4. Speaker Identification via Pinecone and Pretrained Voice Embeddings
+    resolved_identities = {}
+    try:
+        from .speaker_identifier import resolve_speaker_identities
+        resolved_identities = resolve_speaker_identities(
+            audio_data=audio_data,
+            diar_turns=diar_turns,
+            speaker_mapping=speaker_mapping,
+            hf_token=hf_token
+        )
+    except Exception as id_exc:
+        logger.warning(
+            f"Speaker identification step encountered an error: {id_exc}. "
+            "Gracefully falling back to anonymous speaker labels."
+        )
+
     structured_entries = []
 
     for seg in raw_segments:
@@ -353,22 +373,30 @@ def process_audio_file(audio_path, hf_token=None):
         if not best_speaker:
             best_speaker = "SPEAKER_00"
 
-        speaker_label = normalize_speaker_label(best_speaker, speaker_mapping)
+        anon_label = normalize_speaker_label(best_speaker, speaker_mapping)
+        spk_info = resolved_identities.get(best_speaker, {})
+        display_name = spk_info.get("display_name") or anon_label
+        participant_email = spk_info.get("email") or spk_info.get("participant_id")
+        confidence = spk_info.get("confidence", 0.0)
+        is_identified = spk_info.get("is_identified", False)
+
         structured_entries.append({
-            "speaker": speaker_label,
+            "speaker": display_name,
+            "speaker_id": participant_email or anon_label,
+            "email": participant_email if is_identified else None,
+            "anonymous_speaker": anon_label,
+            "is_identified": is_identified,
+            "confidence": confidence,
             "text": text
         })
 
-    # 4. Merge consecutive entries by the same speaker
+    # 5. Merge consecutive entries by the same speaker
     merged_entries = []
     for entry in structured_entries:
         if merged_entries and merged_entries[-1]["speaker"] == entry["speaker"]:
             merged_entries[-1]["text"] += " " + entry["text"]
         else:
-            merged_entries.append({
-                "speaker": entry["speaker"],
-                "text": entry["text"]
-            })
+            merged_entries.append(dict(entry))
 
     logger.info(f"Audio processing complete. Produced {len(merged_entries)} speaker entries.")
     return merged_entries
