@@ -1,8 +1,8 @@
 .page {
     min-height: 100vh;
-    background-color: #0d0d1a;
-    color: #f0f0f5;
-    font-family: 'Inter', sans-serif;
+    background-color: var(--bg-canvas);
+    color: var(--text-primary);
+    font-family: var(--sans);
     display: flex;
     flex-direction: column;
     overflow-x: hidden;

@@ -50,6 +50,7 @@ const Meeting = () => {
     const [summaryText, setSummaryText] = useState('');
     const [summaryReady, setSummaryReady] = useState(false);
     const [modalTab, setModalTab] = useState('summary'); // 'summary' | 'followup'
+    const [idCopied, setIdCopied] = useState(false);
 
     // Meeting report & email delivery states
     const [isDownloadingPdf, setIsDownloadingPdf] = useState(false);
@@ -97,7 +98,6 @@ const Meeting = () => {
                     participants: data.participants || currentParticipants,
                 });
             } else {
-                // Fallback to local state if report endpoint returned error
                 generateMeetingPdfReport({
                     meetingId: id,
                     agenda: '',
@@ -111,7 +111,6 @@ const Meeting = () => {
             }
         } catch (err) {
             console.error('[REPORT_DOWNLOAD] Failed:', err);
-            // Fallback to local state
             generateMeetingPdfReport({
                 meetingId: id,
                 agenda: '',
@@ -173,7 +172,6 @@ const Meeting = () => {
     // Live speech recognition
     const { stopRecognition } = useTranscription(
         meetingAiEnabled && !isMeetingEnded,
-
         audioEnabled,
         name,
         sendTranscriptEntry
@@ -258,12 +256,20 @@ const Meeting = () => {
         endMeetingRequest(true);
     };
 
+    const copyMeetingId = () => {
+        if (id) {
+            navigator.clipboard.writeText(id);
+            setIdCopied(true);
+            setTimeout(() => setIdCopied(false), 2000);
+        }
+    };
+
     const totalParticipants = 1 + remoteStreams.length;
 
     return (
         <div className={`${styles.page} ${meetingAiEnabled && transcriptOpen ? styles.pageWithPanel : ''}`}>
 
-            {/* ── Header ──────────────────────────────────────────── */}
+            {/* ── Top Bar ──────────────────────────────────────────── */}
             <header className={styles.header}>
                 <div className={styles.headerLeft}>
                     <div className={styles.logo}>
@@ -273,14 +279,22 @@ const Meeting = () => {
                 </div>
 
                 <div className={styles.headerCenter}>
-                    <span className={styles.meetingId}>
-                        ID: <strong>{id?.slice(0, 8)}…</strong>
-                    </span>
+                    <button
+                        type="button"
+                        className={styles.meetingIdBtn}
+                        onClick={copyMeetingId}
+                        title="Click to copy room ID"
+                    >
+                        <span className={styles.idPrefix}>Room</span>
+                        <span className={styles.idValue}>{id?.slice(0, 8)}…</span>
+                        <span className={styles.idCopyTip}>{idCopied ? 'Copied!' : 'Copy'}</span>
+                    </button>
                 </div>
 
                 <div className={styles.headerRight}>
                     {summaryReady && summaryText && (
                         <button
+                            type="button"
                             className={styles.viewSummaryBtn}
                             onClick={() => {
                                 setEndDialogOpen(true);
@@ -294,48 +308,55 @@ const Meeting = () => {
                     {meetingAiEnabled && (
                         <span className={styles.aiBadge}>
                             <span className={styles.aiDot} />
-                            AI On
+                            AI Mode
                         </span>
                     )}
                     <span className={`${styles.statusBadge} ${styles[connectionStatus]}`}>
+                        <span className={styles.statusIndicatorDot} />
                         {connectionStatus === 'connected'
-                            ? '● Live'
+                            ? 'Connected'
                             : connectionStatus === 'error'
-                                ? '✕ Error'
-                                : '○ Connecting…'}
+                                ? 'Disconnected'
+                                : 'Connecting'}
                     </span>
                 </div>
             </header>
 
-            {/* ── Video Grid ──────────────────────────────────────── */}
-            <main className={styles.grid} data-count={totalParticipants}>
-
-                <VideoTile
-                    ref={localVideoRef}
-                    name={name}
-                    isLocal={true}
-                    videoEnabled={videoEnabled}
-                />
-
-                {remoteStreams.map(({ name: remoteName, stream }) => (
+            {/* ── Video Workspace ──────────────────────────────────── */}
+            <main className={styles.gridContainer}>
+                <div className={styles.grid} data-count={totalParticipants}>
                     <VideoTile
-                        key={remoteName}
-                        stream={stream}
-                        name={remoteName}
-                        isLocal={false}
+                        ref={localVideoRef}
+                        name={name}
+                        isLocal={true}
+                        videoEnabled={videoEnabled}
                     />
-                ))}
 
-                {remoteStreams.length === 0 && (
-                    <div className={styles.waitingCard}>
-                        <div className={styles.waitingIcon}>👋</div>
-                        <p className={styles.waitingTitle}>Waiting for others…</p>
-                        <p className={styles.waitingHint}>Share your meeting ID to invite participants.</p>
-                        <div className={styles.meetingIdCopy}>
-                            <code className={styles.idText}>{id}</code>
+                    {remoteStreams.map(({ name: remoteName, stream }) => (
+                        <VideoTile
+                            key={remoteName}
+                            stream={stream}
+                            name={remoteName}
+                            isLocal={false}
+                        />
+                    ))}
+
+                    {remoteStreams.length === 0 && (
+                        <div className={styles.waitingCard}>
+                            <div className={styles.waitingIconBadge}>
+                                <span>👥</span>
+                            </div>
+                            <h3 className={styles.waitingTitle}>You're the only one here</h3>
+                            <p className={styles.waitingHint}>Share the room ID with colleagues or guests to begin.</p>
+                            <div className={styles.meetingIdCopyBox}>
+                                <code className={styles.idText}>{id}</code>
+                                <button type="button" className={styles.waitingCopyBtn} onClick={copyMeetingId}>
+                                    {idCopied ? '✓ Copied' : 'Copy ID'}
+                                </button>
+                            </div>
                         </div>
-                    </div>
-                )}
+                    )}
+                </div>
             </main>
 
             {/* ── Control Bar ─────────────────────────────────────── */}
@@ -368,11 +389,11 @@ const Meeting = () => {
                     <div className={styles.modalCard} role="dialog" aria-modal="true" aria-labelledby="end-meeting-title">
                         <div className={styles.modalHeader}>
                             <div>
-                                <p className={styles.modalEyebrow}>Meeting Options</p>
+                                <p className={styles.modalEyebrow}>Meeting Overview</p>
                                 <h2 id="end-meeting-title" className={styles.modalTitle}>
                                     {summaryReady && (summaryText || summaryMessage || summaryError)
-                                        ? 'Meeting Summary & AI Follow-Up'
-                                        : 'Are you sure you want to leave?'}
+                                        ? 'Meeting Summary & Report'
+                                        : 'Leave Video Meeting'}
                                 </h2>
                                 {summaryReady && summaryText && (
                                     <div className={styles.modalNav}>
@@ -381,7 +402,7 @@ const Meeting = () => {
                                             className={`${styles.modalTabBtn} ${modalTab === 'summary' ? styles.modalTabActive : ''}`}
                                             onClick={() => setModalTab('summary')}
                                         >
-                                            Summary & Key Points
+                                            Summary & Key Decisions
                                         </button>
                                         <button
                                             type="button"
@@ -394,7 +415,7 @@ const Meeting = () => {
                                 )}
                             </div>
                             {!summaryLoading && (
-                                <button className={styles.modalClose} onClick={closeEndDialog} aria-label="Close end meeting dialog">
+                                <button className={styles.modalClose} onClick={closeEndDialog} aria-label="Close dialog">
                                     ✕
                                 </button>
                             )}
@@ -403,7 +424,7 @@ const Meeting = () => {
                         {summaryLoading ? (
                             <div className={styles.modalBody}>
                                 <div className={styles.loadingSpinner} />
-                                <p className={styles.modalStatus}>Generating meeting summary...</p>
+                                <p className={styles.modalStatus}>Synthesizing meeting discussion with Gemini AI...</p>
                             </div>
                         ) : summaryReady ? (
                             <div className={styles.modalBody}>
@@ -418,7 +439,7 @@ const Meeting = () => {
                                         {/* Meeting Report Actions (PDF Download & Email Delivery) */}
                                         <div className={styles.reportSection}>
                                             <h4 className={styles.reportSectionTitle}>
-                                                <span>📄</span> Meeting Report & PDF Delivery
+                                                <span>📄</span> Meeting Report & PDF Distribution
                                             </h4>
 
                                             <div className={styles.reportButtonsRow}>
@@ -428,7 +449,7 @@ const Meeting = () => {
                                                     onClick={handleDownloadReportPdf}
                                                     disabled={isDownloadingPdf}
                                                 >
-                                                    <span>{isDownloadingPdf ? '⏳ Generating PDF...' : '📥 Download Meeting Report PDF'}</span>
+                                                    <span>{isDownloadingPdf ? 'Generating PDF...' : '📥 Download Report PDF'}</span>
                                                 </button>
 
                                                 <button
@@ -437,7 +458,7 @@ const Meeting = () => {
                                                     onClick={() => setShowEmailReview(prev => !prev)}
                                                     disabled={isSendingEmail}
                                                 >
-                                                    <span>✉️ Send Meeting Report to Participants</span>
+                                                    <span>✉ Send Report to Participants</span>
                                                 </button>
                                             </div>
 
@@ -445,7 +466,7 @@ const Meeting = () => {
                                             {showEmailReview && (
                                                 <div className={styles.recipientReviewBox}>
                                                     <p className={styles.recipientReviewLabel}>
-                                                        Review participants who will receive the meeting report PDF:
+                                                        Recipients who will receive the official PDF summary:
                                                     </p>
 
                                                     {currentParticipants.length > 0 ? (
@@ -458,21 +479,19 @@ const Meeting = () => {
                                                                 ))}
                                                             </div>
 
-                                                            <div style={{ marginTop: '8px', display: 'flex', gap: '8px', alignItems: 'center' }}>
+                                                            <div className={styles.recipientActionsRow}>
                                                                 <button
                                                                     type="button"
-                                                                    className={styles.sendEmailButton}
+                                                                    className={styles.sendEmailButtonSmall}
                                                                     onClick={handleSendReportEmail}
                                                                     disabled={isSendingEmail}
-                                                                    style={{ padding: '8px 14px', fontSize: '12px' }}
                                                                 >
-                                                                    {isSendingEmail ? 'Sending...' : 'Confirm & Send Report Now'}
+                                                                    {isSendingEmail ? 'Sending...' : 'Confirm & Send Now'}
                                                                 </button>
                                                                 <button
                                                                     type="button"
-                                                                    className={styles.secondaryButton}
+                                                                    className={styles.secondaryButtonSmall}
                                                                     onClick={() => setShowEmailReview(false)}
-                                                                    style={{ padding: '8px 12px', fontSize: '12px' }}
                                                                 >
                                                                     Cancel
                                                                 </button>
@@ -480,7 +499,7 @@ const Meeting = () => {
                                                         </>
                                                     ) : (
                                                         <div className={styles.recipientEmptyWarning}>
-                                                            ⚠️ No participant email addresses were collected for this meeting.
+                                                            ⚠️ No participant email addresses were recorded for this session.
                                                         </div>
                                                     )}
 
@@ -501,19 +520,21 @@ const Meeting = () => {
                                             >
                                                 ← Back to Summary
                                             </button>
-                                            <button className={styles.primaryButton} onClick={handleLeaveOnly}>
-                                                Leave
+                                            <button className={styles.leaveButton} onClick={handleLeaveOnly}>
+                                                Leave Session
                                             </button>
                                         </div>
                                     </>
                                 ) : (
                                     <>
-                                        <pre className={styles.summaryText}>{summaryText}</pre>
+                                        <div className={styles.summaryBox}>
+                                            <pre className={styles.summaryText}>{summaryText}</pre>
+                                        </div>
 
                                         {/* Meeting Report Actions (PDF Download & Email Delivery) */}
                                         <div className={styles.reportSection}>
                                             <h4 className={styles.reportSectionTitle}>
-                                                <span>📄</span> Meeting Report & PDF Delivery
+                                                <span>📄</span> Meeting Report & PDF Distribution
                                             </h4>
 
                                             <div className={styles.reportButtonsRow}>
@@ -523,7 +544,7 @@ const Meeting = () => {
                                                     onClick={handleDownloadReportPdf}
                                                     disabled={isDownloadingPdf}
                                                 >
-                                                    <span>{isDownloadingPdf ? '⏳ Generating PDF...' : '📥 Download Meeting Report PDF'}</span>
+                                                    <span>{isDownloadingPdf ? 'Generating PDF...' : '📥 Download Report PDF'}</span>
                                                 </button>
 
                                                 <button
@@ -532,7 +553,7 @@ const Meeting = () => {
                                                     onClick={() => setShowEmailReview(prev => !prev)}
                                                     disabled={isSendingEmail}
                                                 >
-                                                    <span>✉️ Send Meeting Report to Participants</span>
+                                                    <span>✉ Send Report to Participants</span>
                                                 </button>
                                             </div>
 
@@ -540,7 +561,7 @@ const Meeting = () => {
                                             {showEmailReview && (
                                                 <div className={styles.recipientReviewBox}>
                                                     <p className={styles.recipientReviewLabel}>
-                                                        Review participants who will receive the meeting report PDF:
+                                                        Recipients who will receive the official PDF summary:
                                                     </p>
 
                                                     {currentParticipants.length > 0 ? (
@@ -553,21 +574,19 @@ const Meeting = () => {
                                                                 ))}
                                                             </div>
 
-                                                            <div style={{ marginTop: '8px', display: 'flex', gap: '8px', alignItems: 'center' }}>
+                                                            <div className={styles.recipientActionsRow}>
                                                                 <button
                                                                     type="button"
-                                                                    className={styles.sendEmailButton}
+                                                                    className={styles.sendEmailButtonSmall}
                                                                     onClick={handleSendReportEmail}
                                                                     disabled={isSendingEmail}
-                                                                    style={{ padding: '8px 14px', fontSize: '12px' }}
                                                                 >
-                                                                    {isSendingEmail ? 'Sending...' : 'Confirm & Send Report Now'}
+                                                                    {isSendingEmail ? 'Sending...' : 'Confirm & Send Now'}
                                                                 </button>
                                                                 <button
                                                                     type="button"
-                                                                    className={styles.secondaryButton}
+                                                                    className={styles.secondaryButtonSmall}
                                                                     onClick={() => setShowEmailReview(false)}
-                                                                    style={{ padding: '8px 12px', fontSize: '12px' }}
                                                                 >
                                                                     Cancel
                                                                 </button>
@@ -575,7 +594,7 @@ const Meeting = () => {
                                                         </>
                                                     ) : (
                                                         <div className={styles.recipientEmptyWarning}>
-                                                            ⚠️ No participant email addresses were collected for this meeting.
+                                                            ⚠️ No participant email addresses were recorded for this session.
                                                         </div>
                                                     )}
 
@@ -596,25 +615,24 @@ const Meeting = () => {
                                             >
                                                 ✦ Ask AI Follow-Up Questions →
                                             </button>
-                                            <button className={styles.primaryButton} onClick={handleLeaveOnly}>
-                                                Leave
+                                            <button className={styles.leaveButton} onClick={handleLeaveOnly}>
+                                                Leave Session
                                             </button>
                                         </div>
                                     </>
                                 )}
                             </div>
-
                         ) : (
                             <div className={styles.modalBody}>
                                 <p className={styles.modalHint}>
-                                    Generate an AI summary of the conversation up to this point, or leave the meeting directly.
+                                    Generate an AI summary of all transcribed discussions up to this point, or exit directly.
                                 </p>
                                 <div className={styles.modalActions}>
-                                    <button className={styles.secondaryButton} onClick={handleLeaveOnly}>
+                                    <button className={styles.leaveButton} onClick={handleLeaveOnly}>
                                         Leave Meeting
                                     </button>
                                     <button className={styles.primaryButton} onClick={handleGenerateSummary}>
-                                        Generate Summary
+                                        ✦ Generate AI Summary
                                     </button>
                                 </div>
                             </div>
@@ -622,8 +640,6 @@ const Meeting = () => {
                     </div>
                 </div>
             )}
-
-
         </div>
     );
 };

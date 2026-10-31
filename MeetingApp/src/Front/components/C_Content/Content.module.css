@@ -1,58 +1,73 @@
-/* ── Hero / Content section ──────────────────────────────────────────── */
 .Container {
     display: flex;
     align-items: center;
     justify-content: center;
     flex-direction: column;
-    padding: 80px 24px 48px;
+    padding: 64px 24px 36px;
     text-align: center;
     position: relative;
-    overflow: hidden;
+    max-width: 860px;
+    margin: 0 auto;
 }
 
-/* Subtle radial glow behind the heading */
-.Container::before {
-    content: '';
-    position: absolute;
-    top: -60px;
-    left: 50%;
-    transform: translateX(-50%);
-    width: 600px;
-    height: 400px;
-    background: radial-gradient(ellipse at center, rgba(99, 102, 241, 0.15) 0%, transparent 70%);
-    pointer-events: none;
+.badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 5px 12px;
+    border-radius: var(--radius-sm);
+    background: var(--bg-surface-raised);
+    border: 1px solid var(--border-default);
+    font-size: 0.78rem;
+    font-weight: 500;
+    color: var(--text-secondary);
+    margin-bottom: 20px;
+    letter-spacing: 0.02em;
+}
+
+.badgeDot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--accent-primary);
 }
 
 .heading {
     position: relative;
+    margin-bottom: 14px;
 }
 
 .headingContent {
-    font-family: 'Inter', sans-serif;
-    font-size: clamp(2.4rem, 5vw, 4rem);
-    font-weight: 800;
-    color: #f0f0f5;
-    letter-spacing: -1.5px;
-    line-height: 1.1;
+    font-size: clamp(2rem, 4.2vw, 3.2rem);
+    font-weight: 700;
+    color: var(--text-primary);
+    letter-spacing: -0.035em;
+    line-height: 1.15;
 }
 
-/* Highlighted brand name */
 .inline {
-    background: linear-gradient(135deg, #6366f1, #a78bfa);
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
-    background-clip: text;
+    color: #818cf8;
+    background: none;
+    -webkit-text-fill-color: initial;
 }
 
 .SubContentContainer {
-    margin-top: 20px;
-    max-width: 480px;
+    max-width: 580px;
 }
 
 .SubContent {
-    font-family: 'Inter', sans-serif;
-    font-size: 1.1rem;
-    color: rgba(240, 240, 245, 0.55);
-    line-height: 1.65;
+    font-size: 1.05rem;
+    color: var(--text-secondary);
+    line-height: 1.6;
     font-weight: 400;
+}
+
+@media (max-width: 640px) {
+    .Container {
+        padding: 40px 18px 24px;
+    }
+
+    .SubContent {
+        font-size: 0.95rem;
+    }
 }

@@ -2,14 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import styles from './TranscriptPanel.module.css';
 
 /**
- * TranscriptPanel — collapsible right-side panel displaying live meeting transcript.
- *
- * @param {Array}    entries    - [{ speaker, text, timestamp }]
- * @param {boolean}  isOpen     - Controlled open/close state
- * @param {Function} onToggle   - Called when the toggle button is clicked
- */
-/**
- * TranscriptPanel — collapsible right-side panel displaying live meeting transcript.
+ * TranscriptPanel — collapsible right-side workspace panel displaying live meeting transcript.
  *
  * @param {Array}    entries        - [{ id, speaker, speaker_id, text, timestamp }]
  * @param {boolean}  isOpen         - Controlled open/close state
@@ -108,15 +101,16 @@ const TranscriptPanel = ({
 
     return (
         <>
-            {/* ── Toggle button — always visible ────────────────────── */}
+            {/* ── Toggle button — docked to edge ────────────────────── */}
             <button
                 id="btn-toggle-transcript"
                 className={`${styles.toggleBtn} ${isOpen ? styles.toggleBtnOpen : ''}`}
                 onClick={onToggle}
-                title={isOpen ? 'Close transcript' : 'Open transcript'}
-                aria-label={isOpen ? 'Close transcript' : 'Open transcript'}
+                title={isOpen ? 'Collapse transcript panel' : 'Open live transcript'}
+                aria-label={isOpen ? 'Collapse transcript panel' : 'Open live transcript'}
             >
                 <span className={styles.toggleIcon}>✦</span>
+                <span className={styles.toggleText}>Transcript</span>
                 {!isOpen && entries.length > 0 && (
                     <span className={styles.entryBadge}>{entries.length}</span>
                 )}
@@ -130,11 +124,10 @@ const TranscriptPanel = ({
                 {/* Panel header */}
                 <div className={styles.panelHeader}>
                     <div className={styles.panelTitleGroup}>
-                        <span className={styles.panelIcon}>✦</span>
                         <span className={styles.panelTitle}>Live Transcript</span>
                         <span className={styles.liveChip}>
                             <span className={styles.liveDot} />
-                            Live
+                            Live ASR
                         </span>
                     </div>
                     <button
@@ -150,10 +143,10 @@ const TranscriptPanel = ({
                 <div className={styles.entryList}>
                     {entries.length === 0 ? (
                         <div className={styles.emptyState}>
-                            <div className={styles.emptyIcon}>🎤</div>
-                            <p className={styles.emptyTitle}>No transcript yet</p>
+                            <div className={styles.emptyIcon}>🎙️</div>
+                            <p className={styles.emptyTitle}>Listening for speech...</p>
                             <p className={styles.emptyHint}>
-                                Start speaking and the transcript will appear here in real time.
+                                Real-time transcribed text will appear here as participants speak.
                             </p>
                         </div>
                     ) : (
@@ -174,7 +167,9 @@ const TranscriptPanel = ({
                                 >
                                     <div className={styles.entryMeta}>
                                         <div className={styles.entrySpeakerGroup}>
-                                            <span className={styles.entrySpeaker}>{entry.speaker}</span>
+                                            <span className={isOwn ? styles.entrySpeakerSelf : styles.entrySpeaker}>
+                                                {entry.speaker} {isOwn ? '(You)' : ''}
+                                            </span>
                                             {isOwn && !isEditing && entry.id && (
                                                 <button
                                                     className={styles.editBtn}
@@ -182,7 +177,7 @@ const TranscriptPanel = ({
                                                     title="Edit your transcript entry"
                                                     aria-label="Edit transcript entry"
                                                 >
-                                                    ✎
+                                                    ✎ Edit
                                                 </button>
                                             )}
                                         </div>
@@ -228,9 +223,9 @@ const TranscriptPanel = ({
                 {/* Footer */}
                 <div className={styles.panelFooter}>
                     <span className={styles.footerNote}>
-                        {entries.length} entr{entries.length !== 1 ? 'ies' : 'y'}
+                        {entries.length} {entries.length === 1 ? 'entry' : 'entries'} captured
                     </span>
-                    <span className={styles.footerNote}>Powered by AI Meeting Assistant</span>
+                    <span className={styles.footerNote}>Whisper Live ASR</span>
                 </div>
             </aside>
         </>
@@ -238,4 +233,3 @@ const TranscriptPanel = ({
 };
 
 export default TranscriptPanel;
-

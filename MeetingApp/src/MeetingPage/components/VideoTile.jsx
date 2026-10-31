@@ -2,7 +2,7 @@ import React, { useEffect, useRef, forwardRef } from 'react';
 import styles from './VideoTile.module.css';
 
 /**
- * VideoTile — renders a single participant's video feed with a name label.
+ * VideoTile — renders a single participant's video feed with a clean status label.
  *
  * For the local tile, pass `externalRef` (from useWebRTC) so the hook can
  * assign srcObject directly. For remote tiles, pass `stream` as a prop.
@@ -30,6 +30,7 @@ const VideoTile = forwardRef(function VideoTile(
         }
     }, [stream, isLocal, videoRef]);
 
+    const initial = name ? name.trim().charAt(0).toUpperCase() : '?';
 
     return (
         <div className={`${styles.tile} ${isLocal ? styles.localTile : ''}`}>
@@ -41,20 +42,23 @@ const VideoTile = forwardRef(function VideoTile(
                 className={styles.video}
             />
 
-            {/* Avatar overlay when local video is disabled */}
+            {/* Avatar overlay when video is disabled */}
             {isLocal && !videoEnabled && (
                 <div className={styles.avatarOverlay}>
                     <div className={styles.avatar}>
-                        {name?.charAt(0).toUpperCase()}
+                        {initial}
                     </div>
+                    <span className={styles.avatarName}>{name} (Camera off)</span>
                 </div>
             )}
 
             <div className={styles.nameBar}>
-                <span className={styles.name}>
-                    {name}{isLocal ? ' (You)' : ''}
-                </span>
-                {isLocal && <span className={styles.localBadge}>●</span>}
+                <div className={styles.nameBadge}>
+                    {isLocal && <span className={styles.localDot} title="You" />}
+                    <span className={styles.name}>
+                        {name}{isLocal ? ' (You)' : ''}
+                    </span>
+                </div>
             </div>
         </div>
     );

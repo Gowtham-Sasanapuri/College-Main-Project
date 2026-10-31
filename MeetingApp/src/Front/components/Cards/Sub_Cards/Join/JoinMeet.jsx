@@ -6,10 +6,10 @@ import { useNavigate } from 'react-router-dom';
 
 const JoinMeet = ({ Join }) => {
     const nav = useNavigate();
-    let [name, setName] = useState('');
-    let [email, setEmail] = useState('');
-    let [MeetLink, setMeetLink] = useState('');
-    let [emailError, setEmailError] = useState('');
+    const [name, setName] = useState('');
+    const [email, setEmail] = useState('');
+    const [MeetLink, setMeetLink] = useState('');
+    const [emailError, setEmailError] = useState('');
 
     const validateEmailFormat = (val) => {
         const regex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -40,68 +40,80 @@ const JoinMeet = ({ Join }) => {
     };
 
     return (
-        <div className={styles.Container}>
+        <div className={styles.Container} role="dialog" aria-modal="true" aria-labelledby="join-title">
             <div className={styles.CreateWindow}>
-                <div className={styles.CloseBtnContainer}>
-                    <button className={styles.CloseBtn} onClick={() => Join(false)}>
-                        ✕ Close
+                <div className={styles.modalTopBar}>
+                    <div className={styles.modalTitleGroup}>
+                        <div className={styles.CamImgContainer}>
+                            <img className={styles.CamLogo} src={People} alt="" />
+                        </div>
+                        <div>
+                            <h2 id="join-title" className={styles.HeaderTitle}>Join Meeting</h2>
+                            <p className={styles.HeaderSub}>Connect to an existing conference session</p>
+                        </div>
+                    </div>
+                    <button className={styles.CloseBtn} onClick={() => Join(false)} aria-label="Close dialog">
+                        ✕
                     </button>
                 </div>
 
-                <div className={styles.CamImgContainer}>
-                    <img className={styles.CamLogo} src={People} alt="Join Icon" />
-                </div>
+                <div className={styles.formContent}>
+                    <div className={styles.NameContainer}>
+                        <label className={styles.FieldLabel} htmlFor="join-name">
+                            Your Name <span className={styles.required}>*</span>
+                        </label>
+                        <input
+                            id="join-name"
+                            type="text"
+                            placeholder="e.g. Jordan Lee"
+                            value={name}
+                            onChange={(e) => setName(e.target.value)}
+                        />
+                    </div>
 
-                <div className={styles.Header}>
-                    <h1>Join Meeting</h1>
-                    <p>Enter the meeting ID provided by the host to join.</p>
-                </div>
+                    <div className={styles.NameContainer}>
+                        <label className={styles.FieldLabel} htmlFor="join-email">
+                            Your Email <span className={styles.required}>*</span> <span className={styles.optional}>(for reports & summaries)</span>
+                        </label>
+                        <input
+                            id="join-email"
+                            type="email"
+                            placeholder="jordan@company.com"
+                            value={email}
+                            onChange={(e) => {
+                                setEmail(e.target.value);
+                                if (emailError) setEmailError('');
+                            }}
+                        />
+                        {emailError && <span className={styles.errorText}>{emailError}</span>}
+                    </div>
 
-                <div className={styles.NameContainer}>
-                    <label className={styles.FieldLabel}>Your Name</label>
-                    <input
-                        type="text"
-                        placeholder="Enter your name"
-                        value={name}
-                        onChange={(e) => setName(e.target.value)}
-                    />
-                </div>
+                    <div className={styles.NameContainer}>
+                        <label className={styles.FieldLabel} htmlFor="join-meeting-id">
+                            Meeting ID <span className={styles.required}>*</span>
+                        </label>
+                        <input
+                            id="join-meeting-id"
+                            type="text"
+                            placeholder="Paste meeting UUID or code"
+                            onChange={(e) => setMeetLink(e.target.value)}
+                            value={MeetLink}
+                        />
+                    </div>
 
-                <div className={styles.NameContainer}>
-                    <label className={styles.FieldLabel}>Your Email (for meeting reports)</label>
-                    <input
-                        type="email"
-                        placeholder="e.g. yourname@example.com"
-                        value={email}
-                        onChange={(e) => {
-                            setEmail(e.target.value);
-                            if (emailError) setEmailError('');
-                        }}
-                    />
-                    {emailError && <span className={styles.errorText}>{emailError}</span>}
-                </div>
+                    <div className={styles.tipBox}>
+                        <span className={styles.tipIcon}>ℹ</span>
+                        <p className={styles.tipText}>
+                            Meeting IDs are provided by the session host. Make sure to paste the exact code.
+                        </p>
+                    </div>
 
-                <div className={styles.NameContainer}>
-                    <label className={styles.FieldLabel}>Meeting ID</label>
-                    <input
-                        type="text"
-                        placeholder="Paste or type meeting ID"
-                        onChange={(e) => setMeetLink(e.target.value)}
-                        value={MeetLink}
-                    />
-                </div>
-
-
-                <div className={styles.Quote}>
-                    <p>💡 Tip: Make sure you have the exact meeting ID.</p>
-                    <p>You can get the ID from the meeting creator.</p>
-                </div>
-
-                <div className={styles.LinkCreateContainer}>
-                    <button className={styles.PrimaryBtn} onClick={handleJoin}>
-                        <img className={styles.link} src={link} alt="" />
-                        <span>Join Meeting</span>
-                    </button>
+                    <div className={styles.LinkCreateContainer}>
+                        <button className={styles.PrimaryBtn} onClick={handleJoin}>
+                            <img className={styles.link} src={link} alt="" />
+                            <span>Connect to Meeting</span>
+                        </button>
+                    </div>
                 </div>
             </div>
         </div>

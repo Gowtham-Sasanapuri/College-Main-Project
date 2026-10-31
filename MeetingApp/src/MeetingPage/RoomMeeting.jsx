@@ -42,7 +42,7 @@ const RoomMeeting = () => {
     // Transcript & Summary states
     const [transcript, setTranscript] = useState([]);
     const [summary, setSummary] = useState('');
-    const [activeTab, setActiveTab] = useState('transcript'); // 'transcript' | 'summary'
+    const [activeTab, setActiveTab] = useState('transcript'); // 'transcript' | 'summary' | 'followup'
 
     // Editing state
     const [editingId, setEditingId] = useState(null);
@@ -181,9 +181,7 @@ const RoomMeeting = () => {
             }
 
             const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-
             mediaStreamRef.current = stream;
-
             audioChunksRef.current = [];
 
             // Prefer WAV audio format if supported by browser for native Python decoding fallback
@@ -382,12 +380,12 @@ const RoomMeeting = () => {
             {/* Header */}
             <header className={styles.header}>
                 <div className={styles.headerLeft}>
-                    <button className={styles.backBtn} onClick={() => navigate('/')}>
-                        ← Home
+                    <button type="button" className={styles.backBtn} onClick={() => navigate('/')}>
+                        ← Exit to Lobby
                     </button>
                     <div className={styles.logo}>
-                        <span className={styles.logoIcon}>🎙</span>
-                        <span className={styles.logoText}>Room Meeting</span>
+                        <span className={styles.logoIcon}>🎙️</span>
+                        <span className={styles.logoText}>MeetSpace Room</span>
                     </div>
                 </div>
                 <div className={styles.headerCenter}>
@@ -396,7 +394,7 @@ const RoomMeeting = () => {
                     </span>
                 </div>
                 <div className={styles.headerRight}>
-                    {aiEnabled && <span className={styles.aiChip}>✦ AI Mode Enabled</span>}
+                    {aiEnabled && <span className={styles.aiChip}>✦ AI Diarization Active</span>}
                 </div>
             </header>
 
@@ -405,52 +403,52 @@ const RoomMeeting = () => {
                 {meetingState === 'NOT_STARTED' && (
                     <div className={styles.card}>
                         <div className={styles.cardHeader}>
-                            <h2>In-Person Room Meeting</h2>
-                            <p className={styles.subtitle}>Place this central device in the meeting room.</p>
+                            <h2>In-Person Room Console</h2>
+                            <p className={styles.subtitle}>Place this central device in the meeting space to record.</p>
                         </div>
 
                         {agenda && (
                             <div className={styles.agendaSection}>
-                                <label className={styles.label}>Agenda:</label>
+                                <label className={styles.label}>Meeting Agenda</label>
                                 <div className={styles.agendaBox}>{agenda}</div>
                             </div>
                         )}
 
                         <div className={styles.statusGrid}>
                             <div className={styles.statusTile}>
-                                <span className={styles.statusLabel}>Microphone</span>
-                                <span className={styles.statusValueReady}>● Ready</span>
+                                <span className={styles.statusLabel}>Microphone Status</span>
+                                <span className={styles.statusValueReady}>● Hardware Ready</span>
                             </div>
                             <div className={styles.statusTile}>
-                                <span className={styles.statusLabel}>Recording</span>
-                                <span className={styles.statusValueOff}>○ Not Started</span>
+                                <span className={styles.statusLabel}>Recording State</span>
+                                <span className={styles.statusValueOff}>○ Standby</span>
                             </div>
                         </div>
 
                         {/* Automatic Identification Info Banner */}
                         <div className={styles.autoInfoCard}>
                             <h4 className={styles.autoInfoTitle}>
-                                <span>🎙️</span> Automatic Speaker Identification & Diarization Active
+                                <span>🎙️</span> Automatic Speaker Diarization Active
                             </h4>
                             <p className={styles.autoInfoDesc}>
-                                Place this central device in the room. Participants do not need to register or enter emails.
-                                When the meeting ends, Whisper ASR and Pyannote diarization will automatically transcribe speech and
-                                match voices against registered participant profiles in Pinecone.
+                                Participants do not need to register or enter emails manually. When you end the session,
+                                Whisper ASR and Pyannote diarization will automatically segment speakers and match voices against
+                                registered voice profiles in Pinecone.
                             </p>
                         </div>
 
                         {micPermissionError && (
                             <div className={styles.errorAlert}>
                                 <p>{micPermissionError}</p>
-                                <button className={styles.retryBtn} onClick={handleStartRecording}>
+                                <button type="button" className={styles.retryBtn} onClick={handleStartRecording}>
                                     Retry Permission
                                 </button>
                             </div>
                         )}
 
                         <div className={styles.actionCenter}>
-                            <button className={styles.tapToStartBtn} onClick={handleStartRecording}>
-                                TAP TO START
+                            <button type="button" className={styles.tapToStartBtn} onClick={handleStartRecording}>
+                                <span>● Start Recording Session</span>
                             </button>
                         </div>
                     </div>
@@ -462,14 +460,14 @@ const RoomMeeting = () => {
                         <div className={styles.recordingHeader}>
                             <div className={styles.liveIndicator}>
                                 <span className={styles.redPulse} />
-                                <h3>🔴 Recording...</h3>
+                                <h3>Recording Room Audio...</h3>
                             </div>
-                            <p className={styles.progressText}>Meeting in progress. Recording complete room audio.</p>
+                            <p className={styles.progressText}>All in-room discussions are being captured for processing.</p>
                         </div>
 
                         {agenda && (
                             <div className={styles.agendaSection}>
-                                <label className={styles.label}>Agenda:</label>
+                                <label className={styles.label}>Agenda</label>
                                 <div className={styles.agendaBox}>{agenda}</div>
                             </div>
                         )}
@@ -483,8 +481,8 @@ const RoomMeeting = () => {
                         </div>
 
                         <div className={styles.actionCenter}>
-                            <button className={styles.endMeetingBtn} onClick={handlePromptEndMeeting}>
-                                END MEETING
+                            <button type="button" className={styles.endMeetingBtn} onClick={handlePromptEndMeeting}>
+                                ■ End Session & Process Audio
                             </button>
                         </div>
                     </div>
@@ -494,17 +492,17 @@ const RoomMeeting = () => {
                 {meetingState === 'CONFIRM_END' && (
                     <div className={styles.modalBackdrop}>
                         <div className={styles.modalCard}>
-                            <h3>End Room Meeting?</h3>
-                            <p>
-                                The complete meeting recording will now be processed to identify speakers and generate
-                                the transcript.
+                            <h3 className={styles.confirmTitle}>End Room Recording?</h3>
+                            <p className={styles.confirmText}>
+                                The audio recording will stop and upload to the server for speech-to-text, speaker diarization,
+                                and automated summary generation.
                             </p>
                             <div className={styles.modalActions}>
-                                <button className={styles.cancelBtn} onClick={handleCancelEnd}>
-                                    Cancel
+                                <button type="button" className={styles.cancelBtn} onClick={handleCancelEnd}>
+                                    Resume Recording
                                 </button>
-                                <button className={styles.confirmEndBtn} onClick={handleConfirmEndMeeting}>
-                                    End Meeting
+                                <button type="button" className={styles.confirmEndBtn} onClick={handleConfirmEndMeeting}>
+                                    End & Process Now
                                 </button>
                             </div>
                         </div>
@@ -515,31 +513,31 @@ const RoomMeeting = () => {
                 {meetingState === 'PROCESSING' && (
                     <div className={styles.card}>
                         <div className={styles.cardHeader}>
-                            <h2>Processing Meeting...</h2>
-                            <p className={styles.subtitle}>Please wait while complete audio is analyzed.</p>
+                            <h2>Processing In-Room Audio...</h2>
+                            <p className={styles.subtitle}>Please stand by while the pipeline analyzes voices and speech.</p>
                         </div>
 
                         <div className={styles.progressList}>
                             <div className={`${styles.progressStep} ${processingStep >= 1 ? styles.stepDone : styles.stepActive}`}>
                                 <span className={styles.stepIcon}>{processingStep >= 1 ? '✓' : '●'}</span>
-                                <span>Recording uploaded</span>
+                                <span>Recording uploaded to processing engine</span>
                             </div>
                             <div className={`${styles.progressStep} ${processingStep >= 2 ? styles.stepDone : processingStep === 1 ? styles.stepActive : styles.stepPending}`}>
                                 <span className={styles.stepIcon}>{processingStep >= 2 ? '✓' : processingStep === 1 ? '●' : '○'}</span>
-                                <span>Detecting speakers (Pyannote Diarization)</span>
+                                <span>Segmenting speakers (Pyannote Diarization)</span>
                             </div>
                             <div className={`${styles.progressStep} ${processingStep >= 3 ? styles.stepDone : processingStep === 2 ? styles.stepActive : styles.stepPending}`}>
                                 <span className={styles.stepIcon}>{processingStep >= 3 ? '✓' : processingStep === 2 ? '●' : '○'}</span>
-                                <span>Converting speech to text (Whisper ASR)</span>
+                                <span>Transcribing speech to text (Whisper ASR)</span>
                             </div>
                             <div className={`${styles.progressStep} ${processingStep >= 4 ? styles.stepDone : processingStep === 3 ? styles.stepActive : styles.stepPending}`}>
                                 <span className={styles.stepIcon}>{processingStep >= 4 ? '✓' : processingStep === 3 ? '●' : '○'}</span>
-                                <span>Building speaker-labelled transcript</span>
+                                <span>Matching voice embeddings against Pinecone profiles</span>
                             </div>
                             {aiEnabled && (
                                 <div className={`${styles.progressStep} ${processingStep >= 5 ? styles.stepDone : processingStep === 4 ? styles.stepActive : styles.stepPending}`}>
                                     <span className={styles.stepIcon}>{processingStep >= 5 ? '✓' : processingStep === 4 ? '●' : '○'}</span>
-                                    <span>Generating meeting summary (Gemini)</span>
+                                    <span>Generating executive summary (Gemini AI)</span>
                                 </div>
                             )}
                         </div>
@@ -547,8 +545,8 @@ const RoomMeeting = () => {
                         {processingError && (
                             <div className={styles.errorAlert}>
                                 <p>{processingError}</p>
-                                <button className={styles.retryBtn} onClick={() => setMeetingState('RECORDING')}>
-                                    Return to Meeting
+                                <button type="button" className={styles.retryBtn} onClick={() => setMeetingState('RECORDING')}>
+                                    Return to Recording
                                 </button>
                             </div>
                         )}
@@ -560,26 +558,29 @@ const RoomMeeting = () => {
                     <div className={styles.cardLarge}>
                         <div className={styles.completeHeader}>
                             <div>
-                                <h2>Meeting Processing Complete ✓</h2>
-                                <p className={styles.subtitle}>Speaker-labelled transcript & AI analysis</p>
+                                <h2>Session Processing Complete ✓</h2>
+                                <p className={styles.subtitle}>Speaker-labelled diarized transcript & analysis</p>
                             </div>
                             <div className={styles.tabButtons}>
                                 <button
+                                    type="button"
                                     className={`${styles.tabBtn} ${activeTab === 'transcript' ? styles.tabActive : ''}`}
                                     onClick={() => setActiveTab('transcript')}
                                 >
-                                    View Transcript ({transcript.length})
+                                    Diarized Transcript ({transcript.length})
                                 </button>
                                 {aiEnabled && (
                                     <button
+                                        type="button"
                                         className={`${styles.tabBtn} ${activeTab === 'summary' ? styles.tabActive : ''}`}
                                         onClick={() => setActiveTab('summary')}
                                     >
-                                        View Summary
+                                        Executive Summary
                                     </button>
                                 )}
                                 {aiEnabled && (
                                     <button
+                                        type="button"
                                         className={`${styles.tabBtn} ${activeTab === 'followup' ? styles.tabActive : ''}`}
                                         onClick={() => setActiveTab('followup')}
                                     >
@@ -592,10 +593,10 @@ const RoomMeeting = () => {
                         {/* Transcript Tab */}
                         {activeTab === 'transcript' && (
                             <div className={styles.transcriptContainer}>
-                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
-                                    <h3 className={styles.sectionTitle} style={{ margin: 0 }}>Meeting Transcript</h3>
+                                <div className={styles.transcriptHeaderRow}>
+                                    <h3 className={styles.sectionTitle}>Meeting Transcript</h3>
                                     {transcript.length > 0 && (
-                                        <span style={{ fontSize: '0.85rem', color: '#94a3b8' }}>
+                                        <span className={styles.speakersDetectedCount}>
                                             {uniqueSpeakers.length} speaker{uniqueSpeakers.length !== 1 ? 's' : ''} detected
                                         </span>
                                     )}
@@ -616,7 +617,7 @@ const RoomMeeting = () => {
                                                 >
                                                     {isId ? '✓ ' : '○ '}
                                                     <strong>{spk}</strong>
-                                                    {item?.email && <span style={{ opacity: 0.85, fontSize: '0.75rem' }}>({item.email})</span>}
+                                                    {item?.email && <span className={styles.chipEmail}>({item.email})</span>}
                                                 </span>
                                             );
                                         })}
@@ -648,11 +649,12 @@ const RoomMeeting = () => {
                                                         </div>
                                                         {!isEditing && (
                                                             <button
+                                                                type="button"
                                                                 className={styles.pencilEditBtn}
                                                                 onClick={() => handleStartEdit(entry)}
                                                                 title="Edit transcript text"
                                                             >
-                                                                ✏
+                                                                ✎ Edit
                                                             </button>
                                                         )}
                                                     </div>
@@ -668,6 +670,7 @@ const RoomMeeting = () => {
                                                             {editError && <p className={styles.editErrorMsg}>{editError}</p>}
                                                             <div className={styles.editActions}>
                                                                 <button
+                                                                    type="button"
                                                                     className={styles.saveBtn}
                                                                     onClick={() => handleSaveEdit(entry)}
                                                                     disabled={isSavingEdit}
@@ -675,6 +678,7 @@ const RoomMeeting = () => {
                                                                     {isSavingEdit ? 'Saving...' : 'Save'}
                                                                 </button>
                                                                 <button
+                                                                    type="button"
                                                                     className={styles.cancelEditBtn}
                                                                     onClick={handleCancelEdit}
                                                                     disabled={isSavingEdit}
@@ -698,8 +702,9 @@ const RoomMeeting = () => {
                         {activeTab === 'summary' && aiEnabled && (
                             <div className={styles.summaryContainer}>
                                 <div className={styles.summaryHeaderBar}>
-                                    <h3 className={styles.sectionTitle}>AI Meeting Summary (Gemini)</h3>
+                                    <h3 className={styles.sectionTitle}>AI Executive Summary</h3>
                                     <button
+                                        type="button"
                                         className={styles.regenBtn}
                                         onClick={handleRegenerateSummary}
                                         disabled={isRegeneratingSummary}
@@ -710,7 +715,7 @@ const RoomMeeting = () => {
                                 {summary ? (
                                     <>
                                         <pre className={styles.summaryContent}>{summary}</pre>
-                                        <div style={{ marginTop: '20px' }}>
+                                        <div className={styles.summaryChatWrap}>
                                             <FollowUpChat meetingId={id} meetingMode="room" isSummaryReady={!!summary} />
                                         </div>
                                     </>
@@ -731,8 +736,8 @@ const RoomMeeting = () => {
                         <div className={styles.roomReportActionsCard}>
                             <div className={styles.roomReportHeader}>
                                 <div>
-                                    <h3 className={styles.roomReportTitle}>📄 Meeting Report & Distribution</h3>
-                                    <p className={styles.subtitle} style={{ margin: 0, fontSize: '0.85rem' }}>
+                                    <h3 className={styles.roomReportTitle}>📄 Official Meeting Report & Distribution</h3>
+                                    <p className={styles.roomReportSub}>
                                         Export or distribute the official meeting report with AI summary and follow-up conversation.
                                     </p>
                                 </div>
@@ -743,7 +748,7 @@ const RoomMeeting = () => {
                                         onClick={handleDownloadRoomReportPdf}
                                         disabled={isDownloadingPdf}
                                     >
-                                        {isDownloadingPdf ? 'Generating PDF...' : '⬇ Download Meeting Report PDF'}
+                                        {isDownloadingPdf ? 'Generating PDF...' : '📥 Download Report PDF'}
                                     </button>
                                     <button
                                         type="button"
@@ -752,7 +757,7 @@ const RoomMeeting = () => {
                                         disabled={isSendingEmail || savedParticipants.length === 0}
                                         title={savedParticipants.length === 0 ? 'No registered participant emails were identified' : 'Send PDF to identified participants'}
                                     >
-                                        {isSendingEmail ? 'Sending Emails...' : '✉ Send Meeting Report to Participants'}
+                                        {isSendingEmail ? 'Sending Emails...' : '✉ Send Report to Participants'}
                                     </button>
                                 </div>
                             </div>

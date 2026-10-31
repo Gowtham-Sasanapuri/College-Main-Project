@@ -1,20 +1,21 @@
 .bar {
     position: fixed;
-    bottom: 24px;
+    bottom: 20px;
     left: 50%;
     transform: translateX(-50%);
     display: flex;
     align-items: center;
     justify-content: space-between;
-    gap: 16px;
-    padding: 10px 24px;
-    border-radius: 48px;
-    background: rgba(22, 22, 40, 0.85);
-    backdrop-filter: blur(20px);
-    -webkit-backdrop-filter: blur(20px);
-    border: 1px solid rgba(255, 255, 255, 0.1);
-    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(255,255,255,0.04);
-    min-width: 360px;
+    gap: 24px;
+    padding: 8px 16px;
+    border-radius: var(--radius-lg);
+    background: rgba(18, 22, 34, 0.94);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    border: 1px solid var(--border-default);
+    box-shadow: var(--shadow-lg);
+    min-width: 440px;
+    max-width: 90vw;
     z-index: 100;
 }
 
@@ -22,105 +23,123 @@
 .info {
     display: flex;
     align-items: center;
-    gap: 6px;
-    min-width: 100px;
+    gap: 8px;
+    padding-left: 4px;
+    min-width: 110px;
 }
 
 .dot {
-    width: 8px;
-    height: 8px;
+    width: 7px;
+    height: 7px;
     border-radius: 50%;
-    background: #4ade80;
-    box-shadow: 0 0 6px #4ade80;
+    background: var(--success);
+    box-shadow: 0 0 6px rgba(16, 185, 129, 0.6);
     flex-shrink: 0;
-    animation: pulse 2s infinite;
 }
 
 .count {
-    font-family: 'Inter', sans-serif;
-    font-size: 13px;
+    font-size: 0.78rem;
     font-weight: 500;
-    color: rgba(240, 240, 245, 0.7);
+    color: var(--text-secondary);
     white-space: nowrap;
 }
 
-/* Center — buttons */
-.controls {
+/* Center — Media controls */
+.mediaGroup {
     display: flex;
     align-items: center;
-    gap: 12px;
+    gap: 8px;
 }
 
 .btn {
-    width: 48px;
-    height: 48px;
-    border-radius: 50%;
-    border: none;
-    cursor: pointer;
-    display: flex;
+    display: inline-flex;
     align-items: center;
-    justify-content: center;
-    background: rgba(255, 255, 255, 0.1);
-    color: #f0f0f5;
-    transition: background 0.2s ease, transform 0.15s ease, box-shadow 0.2s ease;
+    gap: 8px;
+    padding: 8px 14px;
+    border-radius: var(--radius-sm);
+    border: 1px solid var(--border-subtle);
+    background: var(--bg-surface-raised);
+    color: var(--text-primary);
+    cursor: pointer;
+    font-size: 0.82rem;
+    font-weight: 500;
+    transition: all 0.15s ease;
 }
 
 .btn:hover {
-    background: rgba(255, 255, 255, 0.18);
-    transform: scale(1.08);
-    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
+    background: var(--bg-surface-hover);
+    border-color: var(--border-strong);
 }
 
-.btn:active {
-    transform: scale(0.96);
+.btnLabel {
+    line-height: 1;
 }
 
-/* Off state — camera/mic disabled */
+/* Off state (Muted / Video Off) */
 .off {
-    background: rgba(239, 68, 68, 0.25);
-    color: #f87171;
-    border: 1px solid rgba(239, 68, 68, 0.3);
+    background: var(--danger-subtle);
+    color: #fca5a5;
+    border-color: var(--danger-border);
 }
 
 .off:hover {
-    background: rgba(239, 68, 68, 0.35);
+    background: rgba(239, 68, 68, 0.2);
+    border-color: rgba(239, 68, 68, 0.45);
 }
 
-/* Hang up — always red */
+/* Right side — Destructive leave action */
+.actionGroup {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    min-width: 110px;
+}
+
 .hangUp {
-    background: #ef4444;
-    color: #fff;
-    width: 52px;
-    height: 52px;
-    box-shadow: 0 4px 16px rgba(239, 68, 68, 0.35);
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 8px 16px;
+    border-radius: var(--radius-sm);
+    border: 1px solid transparent;
+    background: var(--danger);
+    color: #ffffff;
+    font-size: 0.82rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 0.15s ease, transform 0.12s ease;
 }
 
 .hangUp:hover {
-    background: #dc2626;
-    box-shadow: 0 4px 24px rgba(239, 68, 68, 0.55);
+    background: var(--danger-hover);
 }
 
-/* Right spacer — mirrors .info width to keep controls centered */
-.rightSpacer {
-    min-width: 100px;
+.hangUp:active {
+    transform: translateY(1px);
 }
 
-@keyframes pulse {
-    0%, 100% { opacity: 1; }
-    50%       { opacity: 0.5; }
-}
-
-/* Responsive */
-@media (max-width: 480px) {
+@media (max-width: 600px) {
     .bar {
         min-width: unset;
-        width: calc(100% - 32px);
-        bottom: 16px;
-        padding: 10px 16px;
+        width: calc(100% - 24px);
+        bottom: 12px;
+        padding: 6px 10px;
+        gap: 12px;
     }
-    .info,
-    .rightSpacer {
-        min-width: unset;
+
+    .info {
         display: none;
+    }
+
+    .actionGroup {
+        min-width: unset;
+    }
+
+    .btnLabel {
+        display: none;
+    }
+
+    .btn {
+        padding: 8px 10px;
     }
 }

@@ -1,45 +1,99 @@
-/* ── Global reset for the lobby ──────────────────────────────────────── */
-* {
-    padding: 0;
-    margin: 0;
-    box-sizing: border-box;
-}
-
-/* ── Navbar bar ──────────────────────────────────────────────────────── */
 .bar {
     display: flex;
     align-items: center;
-    padding: 14px 28px;
-    background: rgba(13, 13, 26, 0.92);
-    border-bottom: 1px solid rgba(255, 255, 255, 0.07);
-    backdrop-filter: blur(14px);
-    -webkit-backdrop-filter: blur(14px);
+    justify-content: space-between;
+    padding: 12px 28px;
+    background: rgba(18, 22, 34, 0.85);
+    border-bottom: 1px solid var(--border-subtle);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
     position: sticky;
     top: 0;
     z-index: 50;
+    width: 100%;
 }
 
 .LogoContainer {
     display: flex;
     align-items: center;
-    gap: 10px;
+    gap: 12px;
     text-decoration: none;
 }
 
+.logoBadge {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 34px;
+    height: 34px;
+    border-radius: var(--radius-sm);
+    background: var(--accent-subtle);
+    border: 1px solid var(--accent-border);
+}
+
 .logo {
-    width: 36px;
-    height: 36px;
-    /* Tint the SVG icon purple to match the accent */
-    filter: invert(45%) sepia(90%) saturate(700%) hue-rotate(220deg) brightness(110%);
+    width: 20px;
+    height: 20px;
+    filter: invert(45%) sepia(80%) saturate(600%) hue-rotate(205deg) brightness(105%);
+}
+
+.brandGroup {
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
 }
 
 .AppName {
-    font-family: 'Inter', sans-serif;
-    font-size: 1.2rem;
+    font-size: 1.15rem;
     font-weight: 700;
-    background: linear-gradient(135deg, #6366f1, #a78bfa);
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
-    background-clip: text;
-    letter-spacing: -0.3px;
+    letter-spacing: -0.03em;
+    color: var(--text-primary);
+}
+
+.appTag {
+    font-size: 0.72rem;
+    font-weight: 600;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+}
+
+.navRight {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+}
+
+.systemStatus {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 4px 10px;
+    border-radius: var(--radius-sm);
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid var(--border-subtle);
+}
+
+.statusDot {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: var(--success);
+    box-shadow: 0 0 6px rgba(16, 185, 129, 0.6);
+}
+
+.statusText {
+    font-size: 0.75rem;
+    font-weight: 500;
+    color: var(--text-secondary);
+}
+
+@media (max-width: 640px) {
+    .bar {
+        padding: 10px 16px;
+    }
+    
+    .systemStatus {
+        display: none;
+    }
 }

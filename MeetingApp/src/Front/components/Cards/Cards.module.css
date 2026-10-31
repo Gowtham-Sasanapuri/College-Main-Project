@@ -1,118 +1,175 @@
-/* ── Cards row ───────────────────────────────────────────────────────── */
 .Container {
     display: flex;
     align-items: stretch;
     justify-content: center;
-    gap: 24px;
-    padding: 0 24px 80px;
+    gap: 20px;
+    padding: 0 24px 64px;
+    max-width: 1080px;
+    margin: 0 auto;
     flex-wrap: wrap;
+    width: 100%;
 }
 
-/* ── Individual card ─────────────────────────────────────────────────── */
 .Card {
     display: flex;
     flex-direction: column;
-    align-items: center;
-    width: 280px;
-    padding: 32px 24px;
-    border-radius: 16px;
-    background: rgba(255, 255, 255, 0.04);
-    border: 1px solid rgba(255, 255, 255, 0.09);
-    backdrop-filter: blur(12px);
-    -webkit-backdrop-filter: blur(12px);
-    transition: border-color 0.25s ease, box-shadow 0.25s ease, transform 0.2s ease;
+    align-items: flex-start;
+    flex: 1 1 300px;
+    max-width: 340px;
+    padding: 24px;
+    border-radius: var(--radius-lg);
+    background: var(--bg-surface);
+    border: 1px solid var(--border-default);
+    box-shadow: var(--shadow-sm);
+    transition: border-color 0.18s ease, box-shadow 0.18s ease, transform 0.15s ease;
     cursor: default;
+    text-align: left;
 }
 
 .Card:hover {
-    border-color: rgba(99, 102, 241, 0.45);
-    box-shadow: 0 8px 40px rgba(99, 102, 241, 0.15);
-    transform: translateY(-4px);
+    border-color: var(--border-strong);
+    box-shadow: var(--shadow-md);
+    transform: translateY(-2px);
 }
 
-/* ── Icon container ──────────────────────────────────────────────────── */
-.ImgContainer {
-    width: 64px;
-    height: 64px;
-    border-radius: 16px;
-    background: rgba(99, 102, 241, 0.12);
-    border: 1px solid rgba(99, 102, 241, 0.25);
+.cardTop {
     display: flex;
     align-items: center;
-    justify-content: center;
+    justify-content: space-between;
+    width: 100%;
     margin-bottom: 20px;
 }
 
-.ImgContainer img {
-    width: 32px;
-    height: 32px;
-    /* Tint SVG icons to indigo */
-    filter: invert(45%) sepia(90%) saturate(700%) hue-rotate(220deg) brightness(110%);
+.ImgContainer {
+    width: 44px;
+    height: 44px;
+    border-radius: var(--radius-md);
+    background: var(--accent-subtle);
+    border: 1px solid var(--accent-border);
+    display: flex;
+    align-items: center;
+    justify-content: center;
 }
 
-/* ── Card title ──────────────────────────────────────────────────────── */
+.ImgContainer img {
+    width: 22px;
+    height: 22px;
+    filter: invert(45%) sepia(80%) saturate(600%) hue-rotate(205deg) brightness(105%);
+}
+
+.ImgContainerRoom {
+    background: rgba(16, 185, 129, 0.1);
+    border-color: rgba(16, 185, 129, 0.25);
+}
+
+.roomIcon {
+    font-size: 20px;
+    line-height: 1;
+}
+
+.ImgContainerJoin {
+    background: rgba(168, 85, 247, 0.1);
+    border-color: rgba(168, 85, 247, 0.25);
+}
+
+.ImgContainerJoin img {
+    filter: invert(65%) sepia(50%) saturate(600%) hue-rotate(230deg) brightness(105%);
+}
+
+.badge {
+    font-size: 0.72rem;
+    font-weight: 600;
+    padding: 3px 8px;
+    border-radius: var(--radius-xs);
+    background: var(--bg-surface-raised);
+    color: var(--text-secondary);
+    border: 1px solid var(--border-subtle);
+    letter-spacing: 0.02em;
+}
+
+.badgeRoom {
+    color: #6ee7b7;
+    background: rgba(16, 185, 129, 0.08);
+    border-color: rgba(16, 185, 129, 0.2);
+}
+
 .CardInfo {
-    text-align: center;
     margin-bottom: 8px;
 }
 
-.CardInfo p {
-    font-family: 'Inter', sans-serif;
+.CardInfo h3 {
     font-size: 1.15rem;
-    font-weight: 700;
-    color: #f0f0f5;
+    font-weight: 600;
+    color: var(--text-primary);
+    letter-spacing: -0.02em;
 }
 
-/* ── Card description ────────────────────────────────────────────────── */
 .CardSubContentContainer {
     flex: 1;
-    display: flex;
-    align-items: flex-start;
-    justify-content: center;
-    padding: 0 4px;
     margin-bottom: 24px;
 }
 
 .CardSubContentContainer p {
-    font-family: 'Inter', sans-serif;
-    font-size: 0.92rem;
-    color: rgba(240, 240, 245, 0.5);
-    text-align: center;
+    font-size: 0.9rem;
+    color: var(--text-secondary);
     line-height: 1.55;
 }
 
-/* ── CTA button ──────────────────────────────────────────────────────── */
 .MeetingBtn {
     width: 100%;
 }
 
 .MeetingBtn button {
     width: 100%;
-    padding: 12px 20px;
-    font-family: 'Inter', sans-serif;
-    font-size: 0.95rem;
+    padding: 10px 16px;
+    font-size: 0.92rem;
     font-weight: 600;
-    color: #fff;
-    background: linear-gradient(135deg, #6366f1, #7c3aed);
-    border: none;
-    border-radius: 10px;
+    color: #ffffff;
+    background: var(--accent-primary);
+    border: 1px solid transparent;
+    border-radius: var(--radius-md);
     cursor: pointer;
-    transition: box-shadow 0.2s ease, transform 0.15s ease;
-    box-shadow: 0 4px 20px rgba(99, 102, 241, 0.3);
+    transition: background 0.15s ease, border-color 0.15s ease, transform 0.12s ease;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.25);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
 }
 
 .MeetingBtn button:hover {
-    box-shadow: 0 6px 28px rgba(99, 102, 241, 0.5);
-    transform: translateY(-2px);
+    background: var(--accent-hover);
 }
 
 .MeetingBtn button:active {
+    background: var(--accent-active);
     transform: translateY(1px);
-    box-shadow: 0 2px 12px rgba(99, 102, 241, 0.3);
 }
 
-/* Differentiate CreateMeeting vs JoinMeeting card on hover */
-.JoinMeeting:hover {
-    border-color: rgba(167, 139, 250, 0.45);
-    box-shadow: 0 8px 40px rgba(167, 139, 250, 0.12);
+.btnRoom {
+    background: #059669 !important;
+}
+
+.btnRoom:hover {
+    background: #047857 !important;
+}
+
+.btnJoin {
+    background: #2563eb !important;
+}
+
+.btnJoin:hover {
+    background: #1d4ed8 !important;
+}
+
+@media (max-width: 768px) {
+    .Container {
+        padding: 0 16px 48px;
+        gap: 16px;
+    }
+
+    .Card {
+        max-width: 100%;
+        flex: 1 1 100%;
+    }
 }

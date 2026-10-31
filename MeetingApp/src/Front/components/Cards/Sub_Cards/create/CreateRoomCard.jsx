@@ -1,6 +1,5 @@
 import React, { useRef, useState } from 'react';
 import styles from './CreateCard.module.css';
-import Cam from '../../assets/video-svgrepo-com.svg';
 import link from '../../assets/link-svgrepo-com.svg';
 import Copy from '../../assets/copy-4-svgrepo-com.svg';
 import { useNavigate } from 'react-router-dom';
@@ -12,6 +11,7 @@ const CreateRoomCard = ({ Create }) => {
     const [aiEnabled, setAiEnabled] = useState(false);
     const btn = useRef(null);
     const [meeting_id, setId] = useState('');
+    const [copied, setCopied] = useState(false);
 
     const create = () => {
         btn.current.disabled = true;
@@ -34,126 +34,126 @@ const CreateRoomCard = ({ Create }) => {
 
     const Copy_Id = () => {
         navigator.clipboard.writeText(meeting_id);
-        alert('Meeting ID copied to clipboard!');
+        setCopied(true);
+        setTimeout(() => setCopied(false), 2000);
     };
 
     return (
-        <div className={styles.Container}>
+        <div className={styles.Container} role="dialog" aria-modal="true" aria-labelledby="room-create-title">
             <div className={styles.CreateWindow}>
-                <div className={styles.CloseBtnContainer}>
-                    <button className={styles.CloseBtn} onClick={() => Create(false)}>
-                        ✕ Close
+                <div className={styles.modalTopBar}>
+                    <div className={styles.modalTitleGroup}>
+                        <div className={`${styles.CamImgContainer} ${styles.roomDeviceBadge}`}>
+                            <span className={styles.roomIcon}>🎙️</span>
+                        </div>
+                        <div>
+                            <h2 id="room-create-title" className={styles.HeaderTitle}>Create Room Meeting</h2>
+                            <p className={styles.HeaderSub}>In-person recording with automated speaker diarization</p>
+                        </div>
+                    </div>
+                    <button className={styles.CloseBtn} onClick={() => Create(false)} aria-label="Close dialog">
+                        ✕
                     </button>
                 </div>
 
-                <div className={styles.CamImgContainer}>
-                    <img className={styles.CamLogo} src={Cam} alt="Room Icon" />
-                </div>
-
-                <div className={styles.Header}>
-                    <h1>Create Room Meeting</h1>
-                    <p>In-person central device recording with speaker diarization & ASR.</p>
-                </div>
-
-                <div className={styles.NameContainer}>
-                    <label className={styles.FieldLabel}>Meeting / Device Name (Optional)</label>
-                    <input
-                        type="text"
-                        placeholder="e.g. Conference Room A"
-                        value={name}
-                        onChange={(e) => setName(e.target.value)}
-                    />
-                </div>
-
-                <div className={styles.NameContainer}>
-                    <label className={styles.FieldLabel}>Agenda (Optional)</label>
-                    <textarea
-                        placeholder="Discuss project architecture, deployment strategy and timeline..."
-                        onChange={(e) => setAgenda(e.target.value)}
-                        value={Agenda}
-                        maxLength={200}
-                    />
-                </div>
-
-                {/* AI Meeting Assistant opt-in */}
-                <div className={`${styles.AiCard} ${aiEnabled ? styles.AiCardActive : ''}`}>
-                    <div className={styles.AiCardHeader}>
-                        <div className={styles.AiIconBadge}>
-                            <span className={styles.AiIcon}>✦</span>
-                        </div>
-                        <div className={styles.AiTitleGroup}>
-                            <span className={styles.AiTitle}>AI Meeting Assistant</span>
-                            <span className={styles.AiBeta}>Gemini</span>
-                        </div>
-                        <label className={styles.Toggle} htmlFor="ai-room-toggle" aria-label="Enable AI Meeting Assistant">
-                            <input
-                                id="ai-room-toggle"
-                                type="checkbox"
-                                checked={aiEnabled}
-                                onChange={(e) => setAiEnabled(e.target.checked)}
-                            />
-                            <span className={styles.ToggleSlider} />
+                <div className={styles.formContent}>
+                    <div className={styles.NameContainer}>
+                        <label className={styles.FieldLabel} htmlFor="room-name">
+                            Room or Device Identifier <span className={styles.optional}>(Optional)</span>
                         </label>
+                        <input
+                            id="room-name"
+                            type="text"
+                            placeholder="e.g. Conference Room 3B"
+                            value={name}
+                            onChange={(e) => setName(e.target.value)}
+                        />
                     </div>
 
-                    <div className={styles.AiFeatureList}>
-                        <div className={styles.AiFeatureItem}>
-                            <span className={styles.AiFeatureDot} />
-                            <span>Speaker Diarization (Speaker_001, Speaker_002...)</span>
-                        </div>
-                        <div className={styles.AiFeatureItem}>
-                            <span className={styles.AiFeatureDot} />
-                            <span>Post-meeting Speech-to-Text</span>
-                        </div>
-                        <div className={styles.AiFeatureItem}>
-                            <span className={styles.AiFeatureDot} />
-                            <span>Editable transcript entries</span>
-                        </div>
-                        <div className={styles.AiFeatureItem}>
-                            <span className={styles.AiFeatureDot} />
-                            <span>Automatic Google Gemini meeting summary</span>
-                        </div>
+                    <div className={styles.NameContainer}>
+                        <label className={styles.FieldLabel} htmlFor="room-agenda">
+                            Meeting Agenda <span className={styles.optional}>(Optional)</span>
+                        </label>
+                        <textarea
+                            id="room-agenda"
+                            placeholder="Key topics to discuss in the room..."
+                            onChange={(e) => setAgenda(e.target.value)}
+                            value={Agenda}
+                            maxLength={200}
+                        />
                     </div>
 
-                    <p className={styles.AiDisclaimer}>
-                        Full meeting audio is recorded and processed after the meeting ends.
-                    </p>
-                </div>
+                    {/* AI Meeting Assistant opt-in */}
+                    <div className={`${styles.AiCard} ${aiEnabled ? styles.AiCardActive : ''}`}>
+                        <div className={styles.AiCardHeader}>
+                            <div className={styles.AiIconBadge}>✦</div>
+                            <div className={styles.AiTitleGroup}>
+                                <span className={styles.AiTitle}>AI Meeting Assistant</span>
+                                <span className={styles.AiBeta}>Pyannote & Whisper</span>
+                            </div>
+                            <label className={styles.Toggle} htmlFor="ai-room-toggle" aria-label="Enable AI Meeting Assistant">
+                                <input
+                                    id="ai-room-toggle"
+                                    type="checkbox"
+                                    checked={aiEnabled}
+                                    onChange={(e) => setAiEnabled(e.target.checked)}
+                                />
+                                <span className={styles.ToggleSlider} />
+                            </label>
+                        </div>
 
-                <div className={styles.Quote}>
-                    <p>"Great meetings start with a clear purpose."</p>
-                    <p>Place the central device in the room and tap to start when ready.</p>
-                </div>
+                        <div className={styles.AiFeatureList}>
+                            <div className={styles.AiFeatureItem}>
+                                <span className={styles.AiFeatureDot} />
+                                <span>Voice-matched speaker identification (Pinecone vector matching)</span>
+                            </div>
+                            <div className={styles.AiFeatureItem}>
+                                <span className={styles.AiFeatureDot} />
+                                <span>Complete meeting diarization and timeline segmentation</span>
+                            </div>
+                            <div className={styles.AiFeatureItem}>
+                                <span className={styles.AiFeatureDot} />
+                                <span>Automatic summary, action points, and PDF report delivery</span>
+                            </div>
+                        </div>
 
-                {!meeting_id ? (
-                    <div className={styles.LinkCreateContainer}>
-                        <button ref={btn} onClick={create} className={styles.PrimaryBtn}>
-                            <img className={styles.link} src={link} alt="" />
-                            <span>Create Room Meeting</span>
-                        </button>
+                        <p className={styles.AiDisclaimer}>
+                            Audio is processed securely upon ending the in-room recording session.
+                        </p>
                     </div>
-                ) : (
-                    <div className={styles.MeetingIdContainer}>
-                        <div className={styles.IDContent}>
-                            <p className={styles.IdText}>
-                                Meeting ID: <span className={styles.IdHighlight}>{meeting_id}</span>
-                            </p>
-                            <button className={styles.CopyBtn} onClick={Copy_Id} title="Copy ID">
-                                <img className={styles.CopyIcon} src={Copy} alt="Copy" />
+
+                    {!meeting_id ? (
+                        <div className={styles.LinkCreateContainer}>
+                            <button ref={btn} onClick={create} className={`${styles.PrimaryBtn} ${styles.roomPrimaryBtn}`}>
+                                <img className={styles.link} src={link} alt="" />
+                                <span>Initialize Room Session</span>
                             </button>
                         </div>
-                        <button
-                            className={styles.Meet}
-                            onClick={() =>
-                                nav(`/RoomMeeting/${meeting_id}`, {
-                                    state: { name, agenda: Agenda, aiEnabled },
-                                })
-                            }
-                        >
-                            Enter Meeting →
-                        </button>
-                    </div>
-                )}
+                    ) : (
+                        <div className={styles.MeetingIdContainer}>
+                            <div className={styles.IDContent}>
+                                <div className={styles.idInfo}>
+                                    <span className={styles.idLabel}>Room Session ID:</span>
+                                    <span className={styles.IdHighlight}>{meeting_id}</span>
+                                </div>
+                                <button className={styles.CopyBtn} onClick={Copy_Id} title="Copy ID">
+                                    <img className={styles.CopyIcon} src={Copy} alt="" />
+                                    <span>{copied ? 'Copied!' : 'Copy'}</span>
+                                </button>
+                            </div>
+                            <button
+                                className={`${styles.Meet} ${styles.roomPrimaryBtn}`}
+                                onClick={() =>
+                                    nav(`/RoomMeeting/${meeting_id}`, {
+                                        state: { name, agenda: Agenda, aiEnabled },
+                                    })
+                                }
+                            >
+                                Open Room Console →
+                            </button>
+                        </div>
+                    )}
+                </div>
             </div>
         </div>
     );
