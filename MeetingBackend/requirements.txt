@@ -1,0 +1,35 @@
+# ==============================================================================
+# MeetSpace Backend Dependencies (MeetingBackend)
+# ==============================================================================
+
+# --- Core Web Framework & API ---
+Django>=4.2.5,<5.0.0
+djangorestframework>=3.14.0,<4.0.0
+django-cors-headers>=4.3.0,<5.0.0
+asgiref>=3.7.0,<4.0.0
+
+# --- Real-Time WebSockets & Signaling (WebRTC) ---
+channels>=4.0.0,<5.0.0
+daphne>=4.0.0,<5.0.0
+# channels-redis>=4.2.0,<5.0.0 # Uncomment when using Redis in multi-worker production
+
+# --- AI & LLM Service (Google Gemini 2.5 Flash) ---
+google-genai>=2.0.0
+
+# --- Report Generation (PDF & Email Delivery) ---
+reportlab>=4.2.0,<5.0.0
+
+# --- Audio Diarization, Speech-to-Text & Speaker Identification ---
+torch>=2.2.0
+torchaudio>=2.2.0
+pyannote.audio>=3.1.0
+openai-whisper>=20231117
+pinecone>=5.0.0
+numpy>=1.24.0,<3.0.0
+scipy>=1.10.0,<2.0.0
+
+# --- Environment & Utilities ---
+python-dotenv>=1.0.0
+tzdata>=2023.3 # Standard IANA timezones for Windows systems (ZoneInfo "Asia/Kolkata")
+requests>=2.31.0
+

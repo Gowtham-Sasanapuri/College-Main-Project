@@ -1,0 +1,4 @@
+# MeetSpace Root Requirements Proxy
+# Points directly to MeetingBackend/requirements.txt
+-r MeetingBackend/requirements.txt
+
