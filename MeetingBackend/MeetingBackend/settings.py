@@ -40,7 +40,7 @@ _env_logger.info(f"[ENV] GEMINI_API_KEY configured: {bool(os.getenv('GEMINI_API_
 SECRET_KEY = 'django-insecure-)8a0kd%46%m8q@w+1j9_ujjib_%c_jg2!dq6)zlu+n++sofs#5'
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
+DEBUG = False
 
 ALLOWED_HOSTS = ["*"]
 
