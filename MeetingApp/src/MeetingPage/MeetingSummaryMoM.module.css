@@ -1,0 +1,488 @@
+.page {
+    min-height: 100vh;
+    background: var(--bg-canvas);
+    color: var(--text-primary);
+    display: flex;
+    flex-direction: column;
+}
+
+.container {
+    width: 100%;
+    max-width: 1000px;
+    margin: 0 auto;
+    padding: 32px 24px 64px;
+    display: flex;
+    flex-direction: column;
+    gap: 24px;
+}
+
+/* ── Top Bar & Actions ── */
+.topBar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    flex-wrap: wrap;
+    padding-bottom: 20px;
+    border-bottom: 1px solid var(--border-default);
+}
+
+.backBtn {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 14px;
+    border-radius: var(--radius-sm);
+    background: var(--bg-surface);
+    border: 1px solid var(--border-default);
+    color: var(--text-secondary);
+    font-size: 0.86rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.15s ease;
+}
+
+.backBtn:hover {
+    background: var(--bg-surface-hover);
+    color: var(--text-primary);
+    border-color: var(--border-strong);
+}
+
+.actionGroup {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+}
+
+.btnPrimary {
+    padding: 8px 16px;
+    border-radius: var(--radius-sm);
+    background: var(--accent-primary);
+    color: #ffffff;
+    border: none;
+    font-size: 0.86rem;
+    font-weight: 600;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    transition: background 0.15s ease;
+}
+
+.btnPrimary:hover {
+    background: var(--accent-hover);
+}
+
+.btnSecondary {
+    padding: 8px 14px;
+    border-radius: var(--radius-sm);
+    background: var(--bg-surface);
+    color: var(--text-primary);
+    border: 1px solid var(--border-default);
+    font-size: 0.86rem;
+    font-weight: 500;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    transition: all 0.15s ease;
+}
+
+.btnSecondary:hover {
+    background: var(--bg-surface-hover);
+    border-color: var(--border-strong);
+}
+
+.btnSecondary:disabled,
+.btnPrimary:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+/* ── Document Paper Container ── */
+.paper {
+    background: var(--bg-surface);
+    border: 1px solid var(--border-default);
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-md);
+    padding: 40px;
+    display: flex;
+    flex-direction: column;
+    gap: 32px;
+}
+
+@media (max-width: 640px) {
+    .paper {
+        padding: 22px 18px;
+    }
+}
+
+/* ── MoM Header Banner ── */
+.momHeader {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    padding-bottom: 24px;
+    border-bottom: 2px solid var(--border-subtle);
+}
+
+.momBadge {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    align-self: flex-start;
+    padding: 4px 10px;
+    border-radius: var(--radius-xs);
+    background: var(--accent-subtle);
+    color: var(--accent-primary);
+    border: 1px solid var(--accent-border);
+    font-size: 0.76rem;
+    font-weight: 700;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+}
+
+.momTitle {
+    font-size: 1.8rem;
+    font-weight: 800;
+    color: var(--text-primary);
+    margin: 0;
+    letter-spacing: -0.02em;
+}
+
+.momSubtitle {
+    font-size: 0.9rem;
+    color: var(--text-muted);
+}
+
+/* ── Section Styling ── */
+.section {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+}
+
+.sectionHeader {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding-bottom: 8px;
+    border-bottom: 1px solid var(--border-subtle);
+}
+
+.sectionTitle {
+    font-size: 1.12rem;
+    font-weight: 700;
+    color: var(--text-primary);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.sectionLetter {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 24px;
+    height: 24px;
+    border-radius: var(--radius-xs);
+    background: var(--accent-subtle);
+    color: var(--accent-primary);
+    font-size: 0.78rem;
+    font-weight: 800;
+}
+
+/* ── Section A: Info Grid ── */
+.infoGrid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 14px;
+}
+
+.infoCard {
+    padding: 12px 14px;
+    background: var(--bg-surface-raised);
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-sm);
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.infoLabel {
+    font-size: 0.76rem;
+    font-weight: 600;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+}
+
+.infoValue {
+    font-size: 0.92rem;
+    font-weight: 600;
+    color: var(--text-primary);
+}
+
+/* ── Section B: Participants Badges ── */
+.badgesList {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+.participantBadge {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 12px;
+    border-radius: var(--radius-sm);
+    background: var(--bg-surface-raised);
+    border: 1px solid var(--border-default);
+    font-size: 0.84rem;
+    color: var(--text-primary);
+}
+
+.roleTag {
+    font-size: 0.72rem;
+    font-weight: 600;
+    padding: 2px 6px;
+    border-radius: var(--radius-xs);
+    background: var(--accent-subtle);
+    color: var(--accent-primary);
+}
+
+/* ── Section C: Agenda Cards ── */
+.agendaGrid {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.agendaCard {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 12px 16px;
+    background: var(--bg-surface-raised);
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-sm);
+}
+
+.agendaInfo {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.agendaItemTitle {
+    font-size: 0.9rem;
+    font-weight: 600;
+    color: var(--text-primary);
+}
+
+.agendaItemMeta {
+    font-size: 0.78rem;
+    color: var(--text-muted);
+}
+
+.statusTag {
+    font-size: 0.75rem;
+    font-weight: 600;
+    padding: 3px 8px;
+    border-radius: var(--radius-xs);
+    background: var(--bg-surface);
+    border: 1px solid var(--border-default);
+    color: var(--text-secondary);
+}
+
+.statusTagSuccess {
+    background: var(--success-subtle);
+    color: var(--success);
+    border-color: var(--success-border);
+}
+
+/* ── Section D: Executive Summary Card ── */
+.summaryBox {
+    padding: 18px 20px;
+    background: var(--bg-surface-raised);
+    border-left: 4px solid var(--accent-primary);
+    border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+    font-size: 0.95rem;
+    line-height: 1.6;
+    color: var(--text-primary);
+    white-space: pre-wrap;
+}
+
+/* ── Section E: Discussion Points ── */
+.discList {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.discCard {
+    padding: 14px 18px;
+    background: var(--bg-surface-raised);
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-sm);
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.discTopic {
+    font-size: 0.95rem;
+    font-weight: 700;
+    color: var(--text-primary);
+}
+
+.discSpeakers {
+    font-size: 0.76rem;
+    color: var(--accent-primary);
+    font-weight: 600;
+}
+
+.discText {
+    font-size: 0.88rem;
+    line-height: 1.5;
+    color: var(--text-secondary);
+}
+
+/* ── Section F: Decisions List ── */
+.decisionsList {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.decisionItem {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    padding: 10px 14px;
+    background: rgba(16, 185, 129, 0.05);
+    border: 1px solid var(--success-border);
+    border-radius: var(--radius-sm);
+    font-size: 0.9rem;
+    color: var(--text-primary);
+    line-height: 1.5;
+}
+
+.decNumber {
+    font-weight: 700;
+    color: var(--success);
+    flex-shrink: 0;
+}
+
+/* ── Section G: Action Items Table ── */
+.tableResponsive {
+    width: 100%;
+    overflow-x: auto;
+    border: 1px solid var(--border-default);
+    border-radius: var(--radius-md);
+}
+
+.actionTable {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.86rem;
+    text-align: left;
+}
+
+.actionTable th {
+    background: var(--bg-surface-raised);
+    padding: 12px 14px;
+    font-weight: 600;
+    color: var(--text-secondary);
+    border-bottom: 1px solid var(--border-default);
+}
+
+.actionTable td {
+    padding: 12px 14px;
+    border-bottom: 1px solid var(--border-subtle);
+    color: var(--text-primary);
+    vertical-align: middle;
+}
+
+.actionTable tr:last-child td {
+    border-bottom: none;
+}
+
+.rowDone {
+    opacity: 0.65;
+    text-decoration: line-through;
+}
+
+.priorityHigh {
+    color: var(--danger);
+    font-weight: 700;
+}
+
+.priorityMedium {
+    color: var(--warning);
+    font-weight: 600;
+}
+
+.priorityLow {
+    color: var(--success);
+    font-weight: 500;
+}
+
+/* ── Section H & I & J ── */
+.textBlock {
+    padding: 12px 16px;
+    background: var(--bg-surface-raised);
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-sm);
+    font-size: 0.9rem;
+    line-height: 1.5;
+    color: var(--text-secondary);
+}
+
+/* ── Edit Inputs ── */
+.editInput,
+.editTextarea {
+    width: 100%;
+    padding: 8px 12px;
+    border-radius: var(--radius-sm);
+    border: 1px solid var(--border-default);
+    background: var(--bg-canvas);
+    color: var(--text-primary);
+    font-family: inherit;
+    font-size: 0.88rem;
+    outline: none;
+}
+
+.editInput:focus,
+.editTextarea:focus {
+    border-color: var(--border-focus);
+}
+
+.editTextarea {
+    min-height: 90px;
+    resize: vertical;
+}
+
+/* ── Print Styling ── */
+@media print {
+    .topBar,
+    .btnPrimary,
+    .btnSecondary,
+    .backBtn {
+        display: none !important;
+    }
+
+    .page {
+        background: #ffffff !important;
+        color: #000000 !important;
+    }
+
+    .paper {
+        border: none !important;
+        box-shadow: none !important;
+        padding: 0 !important;
+    }
+}
+

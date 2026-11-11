@@ -2,16 +2,19 @@ import os
 import uuid
 import logging
 import tempfile
+from django.utils import timezone
 from rest_framework.decorators import api_view
 from rest_framework.response import Response
 from django.core.validators import validate_email
 from django.core.exceptions import ValidationError
 
-from .models import Meeting, TranscriptEntry, MeetingParticipant
+from .models import Meeting, TranscriptEntry, MeetingParticipant, MeetingAgendaItem
 from .audio_processor import process_audio_file
 from .views import (
     _format_transcript_entries,
     _summarize_transcript,
+    _generate_mom_data,
+    _build_default_mom_data,
     AskFollowUpQuestion,
     GetFollowUpHistory,
     SendMeetingReport,
@@ -27,28 +30,73 @@ logger = logging.getLogger(__name__)
 def CreateRoomMeeting(request):
     """
     Creates a new Room Meeting instance.
-    Accepts name (or host), Agenda (optional), and ai_enabled (optional boolean).
+    Accepts name (or host), title, description, venue (building, floor, room), scheduled times,
+    Agenda, ai_enabled, and agenda_items.
     """
     data = request.data
-    host = data.get("name", "Central Device")
-    agenda = data.get("Agenda", "")
+    host = (data.get("name") or data.get("host") or "Central Device").strip()
+    agenda = (data.get("Agenda") or "").strip()
+    title = (data.get("title") or "").strip()
+    description = (data.get("description") or "").strip()
+    venue = (data.get("venue") or "").strip()
+    scheduled_date = (data.get("scheduled_date") or "").strip()
+    scheduled_start_time = (data.get("scheduled_start_time") or "").strip()
+    scheduled_end_time = (data.get("scheduled_end_time") or "").strip()
+    expected_duration = (data.get("expected_duration") or "").strip()
     ai_enabled = bool(data.get("ai_enabled", False))
-    meeting_id = uuid.uuid4()
+    auto_start = bool(data.get("auto_start", True))
+    agenda_items_data = data.get("agenda_items", [])
 
-    Meeting.objects.create(
+    meeting_id = uuid.uuid4()
+    now = timezone.now()
+
+    meeting = Meeting.objects.create(
         Meeting_id=meeting_id,
         Host_name=host,
-        Agenda=agenda,
-        Status=True,
+        title=title or agenda or f"Room Session {str(meeting_id)[:8]}",
+        description=description,
+        Agenda=agenda or title,
+        Status=True if auto_start else False,
+        lifecycle_status="in_progress" if auto_start else "scheduled",
+        actual_start_time=now if auto_start else None,
+        venue=venue or "Conference Room",
+        scheduled_date=scheduled_date or (now.strftime("%Y-%m-%d") if auto_start else ""),
+        scheduled_start_time=scheduled_start_time or (now.strftime("%H:%M") if auto_start else ""),
+        scheduled_end_time=scheduled_end_time,
+        expected_duration=expected_duration or ("45 mins" if auto_start else ""),
         ai_enabled=ai_enabled,
         meeting_mode="room",
     )
+
+    if isinstance(agenda_items_data, list):
+        for idx, item in enumerate(agenda_items_data):
+            if isinstance(item, dict) and item.get("title"):
+                MeetingAgendaItem.objects.create(
+                    meeting=meeting,
+                    title=item.get("title", "").strip(),
+                    description=item.get("description", "").strip(),
+                    presenter=item.get("presenter", host).strip(),
+                    expected_duration=item.get("expected_duration", "").strip(),
+                    order=idx,
+                    status="Pending",
+                )
+            elif isinstance(item, str) and item.strip():
+                MeetingAgendaItem.objects.create(
+                    meeting=meeting,
+                    title=item.strip(),
+                    presenter=host,
+                    order=idx,
+                    status="Pending",
+                )
 
     logger.info(f"[CREATE_ROOM_MEETING] Created room meeting: {meeting_id}")
 
     return Response({
         "success": True,
         "meeting_id": str(meeting_id),
+        "title": meeting.display_title,
+        "lifecycle_status": meeting.lifecycle_status,
+        "venue": meeting.venue,
         "message": "Room meeting created successfully.",
     })
 
@@ -121,19 +169,34 @@ def ProcessRoomAudio(request):
                 defaults={"name": p_name}
             )
 
+        cutoff = timezone.now()
+        meeting.actual_end_time = cutoff
+        meeting.lifecycle_status = "completed"
+        meeting.Status = False
+        start_time = meeting.actual_start_time or meeting.Created_at
+        if start_time:
+            meeting.actual_duration_seconds = max(0, int((cutoff - start_time).total_seconds()))
+        meeting.save(update_fields=["actual_end_time", "lifecycle_status", "Status", "actual_duration_seconds"])
+
         summary_text = ""
         summary_generated = False
+        mom_data = None
         if meeting.ai_enabled and db_entries:
             transcript_formatted = _format_transcript_entries(
                 meeting.transcript_entries.order_by("timestamp")
             )
             try:
-                summary_text = _summarize_transcript(meeting.Agenda or "", transcript_formatted)
+                mom_data, summary_text = _generate_mom_data(meeting, transcript_formatted)
                 meeting.Summary = summary_text
-                meeting.save(update_fields=["Summary"])
+                meeting.mom_data = mom_data
+                meeting.save(update_fields=["Summary", "mom_data"])
                 summary_generated = True
             except Exception as summary_exc:
                 logger.error(f"[PROCESS_ROOM_AUDIO] Summary generation error: {summary_exc}")
+        else:
+            mom_data = _build_default_mom_data(meeting)
+            meeting.mom_data = mom_data
+            meeting.save(update_fields=["mom_data"])
 
         return Response({
             "success": True,
@@ -146,6 +209,7 @@ def ProcessRoomAudio(request):
             "ai_enabled": meeting.ai_enabled,
             "summary_generated": summary_generated,
             "summary": summary_text,
+            "mom_data": mom_data,
             "message": "Room meeting audio processed successfully."
         })
 
@@ -198,7 +262,7 @@ def UpdateRoomTranscript(request, entry_id):
 @api_view(["POST"])
 def GenerateRoomSummary(request):
     """
-    Generates or updates room meeting summary using latest (possibly edited) transcript.
+    Generates or updates room meeting summary and structured 10-section MoM using latest transcript.
     """
     meeting_id = request.data.get("meeting_id")
     if not meeting_id:
@@ -211,14 +275,16 @@ def GenerateRoomSummary(request):
             return Response({"success": False, "message": "No transcript is available to summarize."}, status=400)
 
         transcript_formatted = _format_transcript_entries(entries)
-        summary = _summarize_transcript(meeting.Agenda or "", transcript_formatted)
+        mom_data, summary = _generate_mom_data(meeting, transcript_formatted)
         meeting.Summary = summary
-        meeting.save(update_fields=["Summary"])
+        meeting.mom_data = mom_data
+        meeting.save(update_fields=["Summary", "mom_data"])
 
         return Response({
             "success": True,
             "summary": summary,
-            "message": "Summary generated successfully."
+            "mom_data": mom_data,
+            "message": "Minutes of Meeting and summary generated successfully."
         })
     except Meeting.DoesNotExist:
         return Response({"success": False, "message": "Meeting not found."}, status=404)
@@ -264,15 +330,41 @@ def GetRoomMeetingDetails(request, meeting_id):
             }
             for p in meeting.participants.all()
         ]
+        agenda_items = [
+            {
+                "id": a.pk,
+                "title": a.title,
+                "description": a.description,
+                "presenter": a.presenter,
+                "expected_duration": a.expected_duration,
+                "order": a.order,
+                "status": a.status,
+            }
+            for a in meeting.agenda_items.all()
+        ]
         return Response({
             "success": True,
             "meeting_id": str(meeting.Meeting_id),
+            "title": meeting.display_title,
+            "description": meeting.description,
             "host_name": meeting.Host_name,
             "agenda": meeting.Agenda,
             "ai_enabled": meeting.ai_enabled,
             "summary": meeting.Summary or "",
+            "mom_data": meeting.mom_data,
+            "has_mom": bool(meeting.mom_data),
             "meeting_mode": meeting.meeting_mode,
             "status": meeting.Status,
+            "lifecycle_status": meeting.lifecycle_status,
+            "venue": meeting.venue,
+            "scheduled_date": meeting.scheduled_date,
+            "scheduled_start_time": meeting.scheduled_start_time,
+            "scheduled_end_time": meeting.scheduled_end_time,
+            "expected_duration": meeting.expected_duration,
+            "actual_start_time": meeting.actual_start_time.isoformat() if meeting.actual_start_time else None,
+            "actual_end_time": meeting.actual_end_time.isoformat() if meeting.actual_end_time else None,
+            "actual_duration_seconds": meeting.actual_duration_seconds,
+            "agenda_items": agenda_items,
             "transcript": transcript,
             "participants": participants,
             "report_sent_at": meeting.report_sent_at.isoformat() if meeting.report_sent_at else None,

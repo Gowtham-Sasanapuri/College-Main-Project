@@ -2,6 +2,7 @@ import React from "react";
 import Navbar from "./components/Navbar/Navbar";
 import Content from "./components/C_Content/Content";
 import MeetingCards from "./components/Cards/MeetingCards";
+import MeetingListHistory from "./components/MeetingList/MeetingListHistory";
 import styles from "./Enter.module.css";
 
 export default function Enter() {
@@ -10,6 +11,7 @@ export default function Enter() {
             <Navbar />
             <Content />
             <MeetingCards />
+            <MeetingListHistory />
         </div>
     );
 }

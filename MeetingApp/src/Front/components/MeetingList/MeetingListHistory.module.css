@@ -1,0 +1,321 @@
+.container {
+    width: 100%;
+    max-width: 1100px;
+    margin: 32px auto 60px;
+    padding: 0 24px;
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+}
+
+.sectionHeader {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    flex-wrap: wrap;
+}
+
+.titleGroup {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.heading {
+    font-size: 1.45rem;
+    font-weight: 700;
+    color: var(--text-primary);
+    margin: 0;
+    letter-spacing: -0.02em;
+}
+
+.subheading {
+    font-size: 0.85rem;
+    color: var(--text-muted);
+}
+
+/* ── Filter Bar ── */
+.filterBar {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    padding: 16px 20px;
+    background: var(--bg-surface);
+    border: 1px solid var(--border-default);
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-sm);
+}
+
+.searchRow {
+    display: flex;
+    gap: 12px;
+    flex-wrap: wrap;
+}
+
+.searchInput {
+    flex: 1;
+    min-width: 240px;
+    padding: 9px 14px;
+    border-radius: var(--radius-sm);
+    background: var(--bg-surface-raised);
+    border: 1px solid var(--border-default);
+    color: var(--text-primary);
+    font-size: 0.88rem;
+    outline: none;
+    transition: border-color 0.15s ease;
+}
+
+.searchInput:focus {
+    border-color: var(--border-focus);
+}
+
+.dateInput {
+    padding: 8px 12px;
+    border-radius: var(--radius-sm);
+    background: var(--bg-surface-raised);
+    border: 1px solid var(--border-default);
+    color: var(--text-primary);
+    font-size: 0.86rem;
+    outline: none;
+}
+
+.pillRow {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    flex-wrap: wrap;
+}
+
+.pillGroup {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex-wrap: wrap;
+}
+
+.filterPill {
+    padding: 5px 12px;
+    border-radius: var(--radius-xs);
+    background: var(--bg-surface-raised);
+    border: 1px solid var(--border-subtle);
+    color: var(--text-secondary);
+    font-size: 0.8rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.15s ease;
+}
+
+.filterPill:hover {
+    color: var(--text-primary);
+    border-color: var(--border-default);
+}
+
+.filterPillActive {
+    background: var(--accent-subtle);
+    color: var(--accent-primary);
+    border-color: var(--accent-border);
+    font-weight: 600;
+}
+
+/* ── Meetings Grid & Cards ── */
+.meetingsList {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+    gap: 18px;
+}
+
+.card {
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    padding: 20px;
+    background: var(--bg-surface);
+    border: 1px solid var(--border-default);
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-sm);
+    transition: transform 0.15s ease, box-shadow 0.15s ease, border-color 0.15s ease;
+    gap: 14px;
+}
+
+.card:hover {
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-md);
+    border-color: var(--border-strong);
+}
+
+.cardTop {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 10px;
+}
+
+.modeBadge {
+    font-size: 0.72rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    padding: 3px 8px;
+    border-radius: var(--radius-xs);
+    background: var(--bg-surface-raised);
+    border: 1px solid var(--border-subtle);
+    color: var(--text-muted);
+}
+
+.statusBadge {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    font-size: 0.75rem;
+    font-weight: 700;
+    padding: 3px 8px;
+    border-radius: var(--radius-xs);
+}
+
+.statusScheduled {
+    background: rgba(59, 130, 246, 0.12);
+    color: #3b82f6;
+    border: 1px solid rgba(59, 130, 246, 0.3);
+}
+
+.statusInProgress {
+    background: var(--success-subtle);
+    color: var(--success);
+    border: 1px solid var(--success-border);
+}
+
+.pulseDot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--success);
+    box-shadow: 0 0 6px rgba(16, 185, 129, 0.8);
+    animation: pulse 1.5s infinite;
+}
+
+.statusCompleted {
+    background: rgba(147, 51, 234, 0.12);
+    color: #a855f7;
+    border: 1px solid rgba(147, 51, 234, 0.3);
+}
+
+.statusCancelled {
+    background: var(--danger-subtle);
+    color: var(--danger);
+    border: 1px solid var(--danger-border);
+}
+
+.cardBody {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.cardTitle {
+    font-size: 1.05rem;
+    font-weight: 700;
+    color: var(--text-primary);
+    line-height: 1.35;
+    margin: 0;
+}
+
+.cardMetaRow {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 0.82rem;
+    color: var(--text-secondary);
+}
+
+.venueText {
+    font-size: 0.8rem;
+    color: var(--text-muted);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.cardFooter {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding-top: 12px;
+    border-top: 1px solid var(--border-subtle);
+}
+
+.btnAction {
+    flex: 1;
+    padding: 8px 12px;
+    border-radius: var(--radius-sm);
+    font-size: 0.82rem;
+    font-weight: 600;
+    cursor: pointer;
+    text-align: center;
+    border: 1px solid transparent;
+    transition: all 0.15s ease;
+    text-decoration: none;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+}
+
+.btnPrimary {
+    background: var(--accent-primary);
+    color: #ffffff;
+}
+
+.btnPrimary:hover {
+    background: var(--accent-hover);
+}
+
+.btnSuccess {
+    background: var(--success);
+    color: #ffffff;
+}
+
+.btnSuccess:hover {
+    background: #047857;
+}
+
+.btnSecondary {
+    background: var(--bg-surface-raised);
+    color: var(--text-primary);
+    border-color: var(--border-default);
+}
+
+.btnSecondary:hover {
+    background: var(--bg-surface-hover);
+    border-color: var(--border-strong);
+}
+
+.btnDanger {
+    background: transparent;
+    color: var(--danger);
+    border-color: var(--danger-border);
+    padding: 6px 10px;
+    font-size: 0.78rem;
+}
+
+.btnDanger:hover {
+    background: var(--danger-subtle);
+}
+
+.emptyState {
+    text-align: center;
+    padding: 48px 24px;
+    background: var(--bg-surface);
+    border: 1px dashed var(--border-default);
+    border-radius: var(--radius-lg);
+    color: var(--text-muted);
+    font-size: 0.95rem;
+}
+
+@keyframes pulse {
+    0% { transform: scale(0.95); opacity: 0.8; }
+    50% { transform: scale(1.15); opacity: 1; }
+    100% { transform: scale(0.95); opacity: 0.8; }
+}
+

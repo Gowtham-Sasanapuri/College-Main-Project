@@ -95,16 +95,44 @@ const RoomMeeting = () => {
     const handleDownloadRoomReportPdf = async () => {
         setIsDownloadingPdf(true);
         try {
+            const backendRes = await fetch(`${API_BASE}/roomMeeting/download-report/${id}/`);
+            if (backendRes.ok) {
+                const blob = await backendRes.blob();
+                const url = window.URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `meeting_report_${String(id).slice(0, 8)}.pdf`;
+                document.body.appendChild(a);
+                a.click();
+                a.remove();
+                window.URL.revokeObjectURL(url);
+                return;
+            }
+        } catch (fetchErr) {
+            console.warn('[ROOM_PDF_DOWNLOAD] Backend download unavailable, trying client fallback:', fetchErr);
+        }
+
+        try {
             const res = await fetch(`${API_BASE}/roomMeeting/report/${id}/`);
             const data = await res.json();
             if (res.ok && data.success) {
                 generateMeetingPdfReport({
                     meetingId: id,
+                    title: data.title || '',
                     agenda: data.agenda || agenda,
                     hostName: data.host_name || name,
                     meetingMode: 'room',
+                    venue: data.venue || 'Meeting Room',
+                    scheduledDate: data.scheduled_date || '',
+                    scheduledStartTime: data.scheduled_start_time || '',
+                    scheduledEndTime: data.scheduled_end_time || '',
+                    expectedDuration: data.expected_duration || '',
+                    actualStartTime: data.actual_start_time || '',
+                    actualEndTime: data.actual_end_time || '',
+                    actualDurationSeconds: data.actual_duration_seconds || 0,
                     createdAt: data.created_at || '',
                     summary: data.summary || summary,
+                    momData: data.mom_data || null,
                     followUpMessages: data.follow_up_messages || [],
                     participants: data.participants || savedParticipants,
                 });
@@ -121,7 +149,7 @@ const RoomMeeting = () => {
                 });
             }
         } catch (err) {
-            console.error('[ROOM_REPORT_DOWNLOAD] Failed:', err);
+            console.error('[ROOM_REPORT_DOWNLOAD] Fallback Failed:', err);
             generateMeetingPdfReport({
                 meetingId: id,
                 agenda: agenda,
@@ -742,6 +770,15 @@ const RoomMeeting = () => {
                                     </p>
                                 </div>
                                 <div className={styles.roomReportButtons}>
+                                    <button
+                                        type="button"
+                                        className={styles.roomDownloadPdfBtn}
+                                        style={{ background: 'var(--accent-subtle)', color: 'var(--accent-primary)', border: '1px solid var(--accent-border)' }}
+                                        onClick={() => window.open(`/MeetingSummary/${id}`, '_blank')}
+                                        title="View structured Minutes of Meeting (MoM)"
+                                    >
+                                        📋 View Full MoM
+                                    </button>
                                     <button
                                         type="button"
                                         className={styles.roomDownloadPdfBtn}

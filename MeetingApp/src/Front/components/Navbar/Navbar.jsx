@@ -1,8 +1,11 @@
 import React from 'react';
 import styles from './navbar.module.css';
 import videoIcon from '../../../assets/video-intelligence-api-svgrepo-com.svg';
+import { useTheme } from '../../../utils/ThemeContext';
 
 const Navbar = () => {
+    const { isDark, toggleTheme } = useTheme();
+
     return (
         <header className={styles.bar}>
             <div className={styles.LogoContainer}>
@@ -19,6 +22,15 @@ const Navbar = () => {
                     <span className={styles.statusDot} />
                     <span className={styles.statusText}>Network Live</span>
                 </div>
+                <button
+                    type="button"
+                    className={styles.themeToggle}
+                    onClick={toggleTheme}
+                    title={`Switch to ${isDark ? 'Light' : 'Dark'} mode`}
+                    aria-label={`Switch to ${isDark ? 'Light' : 'Dark'} mode`}
+                >
+                    <span>{isDark ? '☀️ Light' : '🌙 Dark'}</span>
+                </button>
             </div>
         </header>
     );

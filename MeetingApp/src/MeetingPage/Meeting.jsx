@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useParams, useLocation } from 'react-router-dom';
+import { useParams, useLocation, useNavigate } from 'react-router-dom';
 import { useWebRTC } from './hooks/useWebRTC';
 import { useTranscription } from './hooks/useTranscription';
 import { generateMeetingPdfReport } from '../utils/generatePdfReport';
@@ -7,6 +7,7 @@ import VideoTile from './components/VideoTile';
 import ControlBar from './components/ControlBar';
 import TranscriptPanel from './components/TranscriptPanel';
 import FollowUpChat from './components/FollowUpChat';
+import MeetingDetailsDrawer from './components/MeetingDetailsDrawer';
 import styles from './Meeting.module.css';
 
 const API_BASE = 'http://127.0.0.1:8000';
@@ -14,6 +15,7 @@ const API_BASE = 'http://127.0.0.1:8000';
 const Meeting = () => {
     const { id } = useParams();
     const location = useLocation();
+    const nav = useNavigate();
 
     // `initialAiEnabled` is only a hint from the host's navigation state.
     // Joiners arrive with `location.state = { name, email }` — no aiEnabled field.
@@ -58,6 +60,24 @@ const Meeting = () => {
     const [showEmailReview, setShowEmailReview] = useState(false);
     const [emailNotice, setEmailNotice] = useState({ type: '', message: '' });
     const [currentParticipants, setCurrentParticipants] = useState([]);
+    const [detailsDrawerOpen, setDetailsDrawerOpen] = useState(false);
+    const [meetingDetails, setMeetingDetails] = useState({});
+
+    // Fetch meeting details and start session if scheduled
+    useEffect(() => {
+        if (!id) return;
+        fetch(`${API_BASE}/meeting/details/${id}/`)
+            .then((r) => (r.ok ? r.json() : null))
+            .then((data) => {
+                if (data && data.success) {
+                    setMeetingDetails(data);
+                    if (data.lifecycle_status === 'scheduled') {
+                        fetch(`${API_BASE}/meeting/start/${id}/`, { method: 'POST' }).catch(() => {});
+                    }
+                }
+            })
+            .catch((e) => console.error('Fetch meeting details error:', e));
+    }, [id]);
 
     // Keep participant list synchronized
     useEffect(() => {
@@ -80,20 +100,48 @@ const Meeting = () => {
         }
     }, [endDialogOpen, id]);
 
-    // Download complete PDF report (Summary + FollowUp messages + Metadata)
+    // Download complete PDF report (Official backend PDF with client fallback)
     const handleDownloadReportPdf = async () => {
         setIsDownloadingPdf(true);
+        try {
+            const backendRes = await fetch(`${API_BASE}/meeting/download-report/${id}/`);
+            if (backendRes.ok) {
+                const blob = await backendRes.blob();
+                const url = window.URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `meeting_report_${String(id).slice(0, 8)}.pdf`;
+                document.body.appendChild(a);
+                a.click();
+                a.remove();
+                window.URL.revokeObjectURL(url);
+                return;
+            }
+        } catch (fetchErr) {
+            console.warn('[PDF_DOWNLOAD] Backend download unavailable, trying client fallback:', fetchErr);
+        }
+
         try {
             const res = await fetch(`${API_BASE}/meeting/report/${id}/`);
             const data = await res.json();
             if (res.ok && data.success) {
                 generateMeetingPdfReport({
                     meetingId: id,
+                    title: data.title || '',
                     agenda: data.agenda || '',
                     hostName: data.host_name || '',
                     meetingMode: 'video',
+                    venue: data.venue || '',
+                    scheduledDate: data.scheduled_date || '',
+                    scheduledStartTime: data.scheduled_start_time || '',
+                    scheduledEndTime: data.scheduled_end_time || '',
+                    expectedDuration: data.expected_duration || '',
+                    actualStartTime: data.actual_start_time || '',
+                    actualEndTime: data.actual_end_time || '',
+                    actualDurationSeconds: data.actual_duration_seconds || 0,
                     createdAt: data.created_at || '',
                     summary: data.summary || summaryText,
+                    momData: data.mom_data || null,
                     followUpMessages: data.follow_up_messages || [],
                     participants: data.participants || currentParticipants,
                 });
@@ -110,7 +158,7 @@ const Meeting = () => {
                 });
             }
         } catch (err) {
-            console.error('[REPORT_DOWNLOAD] Failed:', err);
+            console.error('[REPORT_DOWNLOAD] Fallback Failed:', err);
             generateMeetingPdfReport({
                 meetingId: id,
                 agenda: '',
@@ -292,6 +340,25 @@ const Meeting = () => {
                 </div>
 
                 <div className={styles.headerRight}>
+                    <button
+                        type="button"
+                        onClick={() => setDetailsDrawerOpen(true)}
+                        style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '6px',
+                            padding: '6px 12px',
+                            borderRadius: 'var(--radius-sm)',
+                            background: 'var(--bg-surface-raised)',
+                            border: '1px solid var(--border-default)',
+                            color: 'var(--text-primary)',
+                            fontSize: '0.82rem',
+                            fontWeight: '600',
+                            cursor: 'pointer',
+                        }}
+                    >
+                        <span>📋 Details & Agenda</span>
+                    </button>
                     {summaryReady && summaryText && (
                         <button
                             type="button"
@@ -367,6 +434,14 @@ const Meeting = () => {
                 onToggleAudio={toggleAudio}
                 onHangUp={handleHangUp}
                 participantCount={totalParticipants}
+            />
+
+            {/* ── Meeting Details & Agenda Drawer ─────────────────── */}
+            <MeetingDetailsDrawer
+                isOpen={detailsDrawerOpen}
+                onClose={() => setDetailsDrawerOpen(false)}
+                meetingId={id}
+                details={meetingDetails}
             />
 
             {/* ── Transcript Panel ─────────────────────────────────── */}
@@ -608,6 +683,14 @@ const Meeting = () => {
                                         </div>
 
                                         <div className={styles.modalActions}>
+                                            <button
+                                                type="button"
+                                                className={styles.followUpSwitchBtn}
+                                                style={{ background: 'var(--accent-subtle)', color: 'var(--accent-primary)', borderColor: 'var(--accent-border)' }}
+                                                onClick={() => nav(`/MeetingSummary/${id}`)}
+                                            >
+                                                📄 View Full Minutes of Meeting (MoM) →
+                                            </button>
                                             <button
                                                 type="button"
                                                 className={styles.followUpSwitchBtn}

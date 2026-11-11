@@ -3,7 +3,7 @@
     align-items: center;
     justify-content: space-between;
     padding: 12px 28px;
-    background: rgba(18, 22, 34, 0.85);
+    background: var(--bg-surface);
     border-bottom: 1px solid var(--border-subtle);
     backdrop-filter: blur(16px);
     -webkit-backdrop-filter: blur(16px);
@@ -86,6 +86,27 @@
     font-size: 0.75rem;
     font-weight: 500;
     color: var(--text-secondary);
+}
+
+.themeToggle {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    padding: 6px 12px;
+    border-radius: var(--radius-sm);
+    background: var(--bg-surface-raised);
+    border: 1px solid var(--border-default);
+    color: var(--text-primary);
+    font-size: 0.82rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.15s ease;
+}
+
+.themeToggle:hover {
+    background: var(--bg-surface-hover);
+    border-color: var(--border-strong);
 }
 
 @media (max-width: 640px) {

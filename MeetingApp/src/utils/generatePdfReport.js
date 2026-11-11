@@ -10,27 +10,96 @@ export function sanitizeFilename(meetingId) {
 }
 
 /**
- * Generates and downloads a multi-page PDF meeting report using jsPDF.
- *
- * @param {Object} reportData
- * @param {string} reportData.meetingId
- * @param {string} [reportData.agenda]
- * @param {string} [reportData.hostName]
- * @param {string} [reportData.meetingMode] - 'video' | 'room'
- * @param {string} [reportData.createdAt]
- * @param {string} [reportData.summary]
- * @param {Array}  [reportData.followUpMessages]
- * @param {Array}  [reportData.participants]
+ * Formats a Date/ISO string to Indian Standard Time (IST, UTC+05:30) with AM/PM.
+ */
+export function formatISTTime(dateOrIso) {
+    if (!dateOrIso) return 'N/A';
+    try {
+        const d = new Date(dateOrIso);
+        if (isNaN(d.getTime())) return String(dateOrIso);
+        return new Intl.DateTimeFormat('en-IN', {
+            timeZone: 'Asia/Kolkata',
+            hour: '2-digit',
+            minute: '2-digit',
+            second: '2-digit',
+            hour12: true,
+        }).format(d) + ' IST';
+    } catch {
+        return String(dateOrIso);
+    }
+}
+
+/**
+ * Formats a Date/ISO string to IST Date string (e.g. "November 11, 2026").
+ */
+export function formatISTDate(dateOrIso) {
+    if (!dateOrIso) return 'N/A';
+    try {
+        const d = new Date(dateOrIso);
+        if (isNaN(d.getTime())) return String(dateOrIso);
+        return new Intl.DateTimeFormat('en-IN', {
+            timeZone: 'Asia/Kolkata',
+            year: 'numeric',
+            month: 'long',
+            day: 'numeric',
+        }).format(d);
+    } catch {
+        return String(dateOrIso);
+    }
+}
+
+/**
+ * Formats duration in seconds into human-readable hours, minutes, seconds.
+ */
+export function formatDuration(seconds) {
+    const s = Math.max(0, Math.floor(Number(seconds) || 0));
+    if (s <= 0) return 'N/A';
+    const hrs = Math.floor(s / 3600);
+    const mins = Math.floor((s % 3600) / 60);
+    const secs = s % 60;
+    const parts = [];
+    if (hrs > 0) parts.push(`${hrs} hour${hrs !== 1 ? 's' : ''}`);
+    if (mins > 0) parts.push(`${mins} minute${mins !== 1 ? 's' : ''}`);
+    if (secs > 0 || parts.length === 0) parts.push(`${secs} second${secs !== 1 ? 's' : ''}`);
+    return parts.join(' ');
+}
+
+/**
+ * Strips raw markdown tokens (#, ##, **, *, `) from text so raw syntax never renders in PDF.
+ */
+function stripMarkdown(text) {
+    if (!text) return '';
+    return String(text)
+        .replace(/^#{1,6}\s+/gm, '')
+        .replace(/\*\*([^*]+)\*\*/g, '$1')
+        .replace(/\*([^*]+)\*/g, '$1')
+        .replace(/`([^`]+)`/g, '$1')
+        .replace(/^\s*[-*+]\s+/gm, '• ')
+        .trim();
+}
+
+/**
+ * Generates and downloads an A4 PDF Meeting Report adhering to the 2-section MoM specification.
  */
 export function generateMeetingPdfReport({
     meetingId,
+    title = '',
     agenda = '',
     hostName = '',
     meetingMode = 'video',
+    venue = '',
+    scheduledDate = '',
+    scheduledStartTime = '',
+    scheduledEndTime = '',
+    expectedDuration = '',
+    actualStartTime = '',
+    actualEndTime = '',
+    actualDurationSeconds = 0,
     createdAt = '',
     summary = '',
-    followUpMessages = [],
+    momData = null,
     participants = [],
+    followUpMessages = [],
 }) {
     const doc = new jsPDF({
         orientation: 'portrait',
@@ -40,255 +109,434 @@ export function generateMeetingPdfReport({
 
     const pageWidth = 210;
     const pageHeight = 297;
-    const margin = 15;
+    const margin = 14;
     const contentWidth = pageWidth - margin * 2;
-    const bottomLimit = pageHeight - 20;
+    const topLimit = 22;
+    const bottomLimit = pageHeight - 18;
 
-    let y = 18;
+    let y = topLimit;
 
+    // Helper: Page management
     const checkAddPage = (neededHeight) => {
         if (y + neededHeight > bottomLimit) {
             doc.addPage();
-            y = 18;
+            y = topLimit;
             return true;
         }
         return false;
     };
 
-    // ── 1. Document Header ──────────────────────────────────────────────
-    doc.setFont('helvetica', 'bold');
-    doc.setFontSize(18);
-    doc.setTextColor(79, 70, 229); // #4F46E5 primary indigo
-    doc.text('MEETSPACE MEETING REPORT', margin, y);
-    y += 6;
+    // Extract structured data from momData or parameters
+    const momInfo = momData?.meeting_info || {};
+    const momSummary = momData?.summary || {};
 
-    doc.setFont('helvetica', 'normal');
-    doc.setFontSize(8.5);
-    doc.setTextColor(100, 116, 139); // #64748B
-    const genDate = new Date().toUTCString();
-    doc.text(`Generated on ${genDate} • Confidential`, margin, y);
-    y += 5;
+    const displayTitle = title || momInfo.title || (agenda ? `Meeting: ${agenda.slice(0, 40)}` : `Meeting ${String(meetingId).slice(0, 8)}`);
+    const isRoom = meetingMode === 'room' || (momInfo.meeting_type && momInfo.meeting_type.toLowerCase().includes('room'));
+    const modeLabel = isRoom ? 'In-Room Meeting' : 'Online Video Meeting';
 
-    doc.setDrawColor(203, 213, 225); // #CBD5E1
-    doc.setLineWidth(0.4);
-    doc.line(margin, y, margin + contentWidth, y);
-    y += 6;
+    const organizer = hostName || momInfo.organizer || 'Organizer';
+    const dateStr = scheduledDate || momInfo.date || (actualStartTime ? formatISTDate(actualStartTime) : (createdAt ? formatISTDate(createdAt) : formatISTDate(new Date())));
 
-    // ── 2. Metadata Card ────────────────────────────────────────────────
-    const modeLabel = meetingMode === 'room' ? 'Room Meeting (In-Person Diarized)' : 'Video Calling';
-    const dateFormatted = createdAt ? new Date(createdAt).toLocaleString() : 'N/A';
+    // Calculate actual duration
+    let durSecs = Number(actualDurationSeconds || momInfo.actual_duration_seconds || 0);
+    if (durSecs <= 0 && actualStartTime && actualEndTime) {
+        try {
+            const startMs = new Date(actualStartTime).getTime();
+            const endMs = new Date(actualEndTime).getTime();
+            if (!isNaN(startMs) && !isNaN(endMs) && endMs >= startMs) {
+                durSecs = Math.floor((endMs - startMs) / 1000);
+            }
+        } catch {
+            durSecs = 0;
+        }
+    }
+    const actualDurStr = durSecs > 0 ? formatDuration(durSecs) : (momInfo.actual_duration || 'N/A');
 
+    const actStartStr = actualStartTime ? formatISTTime(actualStartTime) : (momInfo.actual_start_time || 'N/A');
+    const actEndStr = actualEndTime ? formatISTTime(actualEndTime) : (momInfo.actual_end_time || 'N/A');
+
+    const schedStartStr = scheduledStartTime || momInfo.scheduled_start_time || 'N/A';
+    const schedEndStr = scheduledEndTime || momInfo.scheduled_end_time || 'N/A';
+    const schedDurStr = expectedDuration || momInfo.scheduled_duration || 'N/A';
+    const schedCombined = schedStartStr !== 'N/A' ? `${schedStartStr} - ${schedEndStr} (${schedDurStr})` : 'Not scheduled';
+
+    const venueOrLink = venue || momInfo.venue || (isRoom ? 'Meeting Room' : `Online Link: /Meeting/${meetingId}`);
+    const venueLabel = isRoom ? 'Venue' : 'Online Meeting Link';
+
+    // Participants list
     const participantList = participants && participants.length > 0
-        ? participants.map(p => (p.name && p.name !== p.email ? `${p.name} <${p.email}>` : p.email)).join(', ')
-        : 'None recorded';
+        ? participants.map(p => (p.name && p.name !== p.email ? `${p.name} (${p.email})` : (p.email || p.name))).join(', ')
+        : (momInfo.participants ? momInfo.participants.map(p => p.name || p.email || p).join(', ') : organizer);
 
-    const metaItems = [
-        ['Meeting ID:', String(meetingId || 'N/A'), 'Mode:', modeLabel],
-        ['Host / Device:', hostName || 'Organizer', 'Date & Time:', dateFormatted],
-        ['Agenda:', agenda || 'No specific agenda provided', '', ''],
-        ['Recipients:', participantList, '', ''],
-    ];
-
-    // Calculate metadata box height dynamically
-    doc.setFontSize(8.5);
-    const agendaLines = doc.splitTextToSize(`Agenda: ${agenda || 'None'}`, contentWidth - 8);
-    const recipientLines = doc.splitTextToSize(`Recipients: ${participantList}`, contentWidth - 8);
-    const metaBoxHeight = 22 + (agendaLines.length - 1) * 4 + (recipientLines.length - 1) * 4;
-
-    checkAddPage(metaBoxHeight + 6);
-
-    doc.setFillColor(248, 250, 252); // #F8FAFC
-    doc.setDrawColor(203, 213, 225);
-    doc.roundedRect(margin, y, contentWidth, metaBoxHeight, 2, 2, 'FD');
-
-    let metaY = y + 5;
-    doc.setFont('helvetica', 'bold');
-    doc.setTextColor(30, 41, 59);
-    doc.text('Meeting ID:', margin + 4, metaY);
-    doc.setFont('helvetica', 'normal');
-    doc.setTextColor(15, 23, 42);
-    doc.text(String(meetingId || 'N/A').slice(0, 36), margin + 25, metaY);
-
-    doc.setFont('helvetica', 'bold');
-    doc.setTextColor(30, 41, 59);
-    doc.text('Mode:', margin + 98, metaY);
-    doc.setFont('helvetica', 'normal');
-    doc.setTextColor(15, 23, 42);
-    doc.text(modeLabel, margin + 112, metaY);
-
-    metaY += 5;
-    doc.setFont('helvetica', 'bold');
-    doc.setTextColor(30, 41, 59);
-    doc.text('Host:', margin + 4, metaY);
-    doc.setFont('helvetica', 'normal');
-    doc.setTextColor(15, 23, 42);
-    doc.text(String(hostName || 'Organizer').slice(0, 32), margin + 25, metaY);
-
-    doc.setFont('helvetica', 'bold');
-    doc.setTextColor(30, 41, 59);
-    doc.text('Date:', margin + 98, metaY);
-    doc.setFont('helvetica', 'normal');
-    doc.setTextColor(15, 23, 42);
-    doc.text(dateFormatted, margin + 112, metaY);
-
-    metaY += 5;
-    doc.setFont('helvetica', 'bold');
-    doc.setTextColor(30, 41, 59);
-    doc.text('Agenda:', margin + 4, metaY);
-    doc.setFont('helvetica', 'normal');
-    doc.setTextColor(15, 23, 42);
-    const wrappedAgenda = doc.splitTextToSize(agenda || 'No specific agenda provided', contentWidth - 30);
-    doc.text(wrappedAgenda, margin + 25, metaY);
-    metaY += wrappedAgenda.length * 4;
-
-    doc.setFont('helvetica', 'bold');
-    doc.setTextColor(30, 41, 59);
-    doc.text('Recipients:', margin + 4, metaY);
-    doc.setFont('helvetica', 'normal');
-    doc.setTextColor(15, 23, 42);
-    const wrappedRecipients = doc.splitTextToSize(participantList, contentWidth - 30);
-    doc.text(wrappedRecipients, margin + 25, metaY);
-
-    y += metaBoxHeight + 8;
-
-    // ── 3. Generated Meeting Summary ────────────────────────────────────
-    checkAddPage(15);
-    doc.setFont('helvetica', 'bold');
-    doc.setFontSize(12);
-    doc.setTextColor(15, 23, 42);
-    doc.text('1. Generated Meeting Summary', margin, y);
-    y += 6;
-
-    if (summary && summary.trim()) {
-        const paragraphs = summary.trim().split(/\n\n+/);
-        doc.setFontSize(9);
-        doc.setFont('helvetica', 'normal');
-
-        for (const para of paragraphs) {
-            const cleanPara = para.trim();
-            if (!cleanPara) continue;
-
-            // Check if major heading like "1. Meeting Overview" or "## Overview"
-            const isHeading = /^(\d+\.\s+[A-Za-z]|##+\s+)/.test(cleanPara);
-
-            if (isHeading) {
-                checkAddPage(10);
-                doc.setFont('helvetica', 'bold');
-                doc.setTextColor(30, 41, 59);
-                const headingText = cleanPara.replace(/^##+\s*/, '');
-                doc.text(headingText, margin, y);
-                y += 5;
-                doc.setFont('helvetica', 'normal');
-                doc.setTextColor(30, 41, 59);
-            } else {
-                const lines = cleanPara.split('\n');
-                for (const line of lines) {
-                    const cleanLine = line.trim();
-                    if (!cleanLine) continue;
-
-                    const isBullet = cleanLine.startsWith('- ') || cleanLine.startsWith('* ');
-                    const textToRender = isBullet ? `•  ${cleanLine.slice(2)}` : cleanLine;
-                    const xIndent = isBullet ? margin + 3 : margin;
-                    const renderWidth = isBullet ? contentWidth - 3 : contentWidth;
-
-                    const wrapped = doc.splitTextToSize(textToRender, renderWidth);
-                    checkAddPage(wrapped.length * 4.5 + 2);
-
-                    doc.text(wrapped, xIndent, y);
-                    y += wrapped.length * 4.5 + 1;
-                }
-                y += 2; // paragraph spacing
-            }
-        }
-    } else {
-        checkAddPage(8);
-        doc.setFont('helvetica', 'italic');
-        doc.setFontSize(9);
-        doc.setTextColor(100, 116, 139);
-        doc.text('No meeting summary was generated for this session.', margin, y);
-        y += 6;
+    // Agenda text
+    let agendaStr = agenda || 'None specified';
+    if (momInfo.agenda && Array.isArray(momInfo.agenda) && momInfo.agenda.length > 0) {
+        agendaStr = momInfo.agenda.map((a, i) => `${i + 1}. ${a.title || a}`).join('; ');
     }
 
+    // ── 1. Document Header ──────────────────────────────────────────────
+    doc.setFillColor(30, 41, 59); // Slate-800
+    doc.rect(margin, y, contentWidth, 12, 'F');
+
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(13);
+    doc.setTextColor(255, 255, 255);
+    doc.text('MEETSPACE MEETING REPORT', margin + 4, y + 8);
+
+    doc.setFontSize(8);
+    doc.setTextColor(203, 213, 225);
+    doc.text('CONFIDENTIAL', margin + contentWidth - 4, y + 8, { align: 'right' });
+
+    y += 16;
+
+    // Title & Subtitle
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(15);
+    doc.setTextColor(15, 23, 42);
+    const titleLines = doc.splitTextToSize(displayTitle, contentWidth);
+    doc.text(titleLines, margin, y);
+    y += titleLines.length * 6 + 1;
+
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(9);
+    doc.setTextColor(100, 116, 139);
+    doc.text(`${modeLabel} • Generated: ${formatISTTime(new Date())}`, margin, y);
+    y += 7;
+
+    // ── SECTION 1: MEETING INFORMATION ──────────────────────────────────
+    checkAddPage(20);
+    doc.setFillColor(241, 245, 249); // slate-100
+    doc.rect(margin, y, contentWidth, 7, 'F');
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(10);
+    doc.setTextColor(30, 41, 59);
+    doc.text('SECTION 1: MEETING INFORMATION', margin + 3, y + 5);
+    y += 10;
+
+    const renderMetaRow = (label1, val1, label2, val2) => {
+        const col1W = 28;
+        const col2W = 60;
+        const col3W = 28;
+        const col4W = contentWidth - (col1W + col2W + col3W);
+
+        doc.setFontSize(8.5);
+        const wrapped1 = doc.splitTextToSize(String(val1 || 'N/A'), col2W - 2);
+        const wrapped2 = label2 ? doc.splitTextToSize(String(val2 || 'N/A'), col4W - 2) : [];
+        const maxLines = Math.max(wrapped1.length, wrapped2.length || 1);
+        const rowH = Math.max(6, maxLines * 4.2 + 2);
+
+        checkAddPage(rowH);
+
+        doc.setFont('helvetica', 'bold');
+        doc.setTextColor(71, 85, 105);
+        doc.text(label1, margin + 2, y + 4);
+
+        doc.setFont('helvetica', 'normal');
+        doc.setTextColor(15, 23, 42);
+        doc.text(wrapped1, margin + col1W, y + 4);
+
+        if (label2) {
+            doc.setFont('helvetica', 'bold');
+            doc.setTextColor(71, 85, 105);
+            doc.text(label2, margin + col1W + col2W + 2, y + 4);
+
+            doc.setFont('helvetica', 'normal');
+            doc.setTextColor(15, 23, 42);
+            doc.text(wrapped2, margin + col1W + col2W + col3W, y + 4);
+        }
+
+        // Bottom border line
+        doc.setDrawColor(241, 245, 249);
+        doc.setLineWidth(0.2);
+        doc.line(margin, y + rowH, margin + contentWidth, y + rowH);
+
+        y += rowH;
+    };
+
+    renderMetaRow('Meeting Title:', displayTitle, 'Meeting ID:', String(meetingId || 'N/A').slice(0, 36));
+    renderMetaRow('Meeting Type:', modeLabel, 'Date (IST):', dateStr);
+    renderMetaRow('Organizer:', organizer, venueLabel + ':', venueOrLink);
+    renderMetaRow('Attendees:', participantList);
+    renderMetaRow('Meeting Agenda:', agendaStr);
+    renderMetaRow('Scheduled (IST):', schedCombined);
+    renderMetaRow('Actual (IST):', `${actStartStr} - ${actEndStr}`, 'Actual Duration:', actualDurStr);
+
+    y += 6;
+
+    // ── SECTION 2: MEETING SUMMARY ──────────────────────────────────────
+    checkAddPage(20);
+    doc.setFillColor(241, 245, 249);
+    doc.rect(margin, y, contentWidth, 7, 'F');
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(10);
+    doc.setTextColor(30, 41, 59);
+    doc.text('SECTION 2: MEETING SUMMARY', margin + 3, y + 5);
+    y += 11;
+
+    // 1. Meeting Overview
+    const overviewText = stripMarkdown(
+        momSummary.meeting_overview || momData?.executive_summary || summary || 'Meeting completed and recorded successfully.'
+    );
+    checkAddPage(14);
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(9.5);
+    doc.setTextColor(15, 23, 42);
+    doc.text('Meeting Overview', margin, y);
     y += 5;
 
-    // ── 4. AI Follow-Up Conversation ───────────────────────────────────
-    checkAddPage(15);
-    doc.setFont('helvetica', 'bold');
-    doc.setFontSize(12);
-    doc.setTextColor(15, 23, 42);
-    doc.text('2. Complete AI Follow-Up Conversation', margin, y);
-    y += 6;
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(8.5);
+    doc.setTextColor(51, 65, 85);
+    const wrappedOverview = doc.splitTextToSize(overviewText, contentWidth);
+    checkAddPage(wrappedOverview.length * 4.2 + 2);
+    doc.text(wrappedOverview, margin, y);
+    y += wrappedOverview.length * 4.2 + 4;
 
-    if (followUpMessages && followUpMessages.length > 0) {
-        for (const msg of followUpMessages) {
-            const isUser = msg.message_by === 'user';
-            const senderLabel = isUser ? 'User / Participant' : '✦ AI Assistant';
-            const timeStr = msg.timestamp
-                ? new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })
-                : '';
+    // 2. Key Discussion Points
+    const rawPoints = momSummary.discussion_points || momData?.discussion_points || [];
+    if (rawPoints && rawPoints.length > 0) {
+        checkAddPage(12);
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(9.5);
+        doc.setTextColor(15, 23, 42);
+        doc.text('Key Discussion Points', margin, y);
+        y += 5;
 
-            doc.setFontSize(8.5);
-            const wrappedContent = doc.splitTextToSize(msg.content || '', contentWidth - 10);
-            const cardHeight = 10 + wrappedContent.length * 4.2;
+        doc.setFont('helvetica', 'normal');
+        doc.setFontSize(8.5);
+        doc.setTextColor(51, 65, 85);
 
-            checkAddPage(cardHeight + 4);
-
-            // Card background & border
-            if (isUser) {
-                doc.setFillColor(241, 245, 249); // #F1F5F9 slate
-                doc.setDrawColor(203, 213, 225);
+        for (const pt of rawPoints) {
+            let ptText = '';
+            if (typeof pt === 'object' && pt !== null) {
+                const topic = pt.topic ? `[${stripMarkdown(pt.topic)}] ` : '';
+                ptText = topic + stripMarkdown(pt.details || pt.text || '');
             } else {
-                doc.setFillColor(238, 242, 255); // #EEF2FF indigo light
-                doc.setDrawColor(199, 210, 254);
+                ptText = stripMarkdown(String(pt));
             }
+            if (!ptText.trim()) continue;
 
-            doc.roundedRect(margin, y, contentWidth, cardHeight, 1.5, 1.5, 'FD');
-
-            // Header line inside card
-            doc.setFont('helvetica', 'bold');
-            doc.setTextColor(isUser ? 51 : 79, isUser ? 65 : 70, isUser ? 85 : 229);
-            doc.text(senderLabel, margin + 4, y + 4.5);
-
-            if (timeStr) {
-                doc.setFont('helvetica', 'normal');
-                doc.setFontSize(7.5);
-                doc.setTextColor(148, 163, 184);
-                doc.text(timeStr, margin + contentWidth - 4, y + 4.5, { align: 'right' });
-            }
-
-            // Message content
-            doc.setFont('helvetica', 'normal');
-            doc.setFontSize(8.5);
-            doc.setTextColor(15, 23, 42);
-            doc.text(wrappedContent, margin + 4, y + 9);
-
-            y += cardHeight + 3.5;
+            const wrappedPt = doc.splitTextToSize(`•  ${ptText}`, contentWidth - 4);
+            checkAddPage(wrappedPt.length * 4.2 + 1);
+            doc.text(wrappedPt, margin + 2, y);
+            y += wrappedPt.length * 4.2 + 1.5;
         }
-    } else {
-        checkAddPage(8);
-        doc.setFont('helvetica', 'italic');
-        doc.setFontSize(9);
-        doc.setTextColor(100, 116, 139);
-        doc.text('No follow-up questions were asked for this meeting.', margin, y);
-        y += 6;
+        y += 3;
     }
 
-    // ── 5. Add Page Numbers and Running Footers to All Pages ─────────────
+    // 3. Decisions Made (omitted if empty)
+    const rawDecisions = momSummary.decisions || momData?.decisions_made || [];
+    const validDecisions = Array.isArray(rawDecisions)
+        ? rawDecisions.filter(d => String(d).trim() && !['none', 'none agreed', 'n/a', 'no decisions made'].includes(String(d).toLowerCase().trim()))
+        : [];
+
+    if (validDecisions.length > 0) {
+        checkAddPage(12);
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(9.5);
+        doc.setTextColor(15, 23, 42);
+        doc.text('Decisions Made', margin, y);
+        y += 5;
+
+        doc.setFont('helvetica', 'normal');
+        doc.setFontSize(8.5);
+        doc.setTextColor(51, 65, 85);
+
+        validDecisions.forEach((dec, idx) => {
+            const decText = stripMarkdown(String(dec));
+            const wrappedDec = doc.splitTextToSize(`${idx + 1}.  ${decText}`, contentWidth - 4);
+            checkAddPage(wrappedDec.length * 4.2 + 1);
+            doc.text(wrappedDec, margin + 2, y);
+            y += wrappedDec.length * 4.2 + 1.5;
+        });
+        y += 3;
+    }
+
+    // 4. Action Items (omitted if empty)
+    const rawActions = momSummary.action_items || momData?.action_items || [];
+    const validActions = Array.isArray(rawActions)
+        ? rawActions.filter(a => {
+            if (typeof a === 'object' && a !== null) {
+                const desc = a.task || a.description || '';
+                return desc.trim().length > 0;
+            }
+            return String(a).trim().length > 0;
+        })
+        : [];
+
+    if (validActions.length > 0) {
+        checkAddPage(16);
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(9.5);
+        doc.setTextColor(15, 23, 42);
+        doc.text('Action Items', margin, y);
+        y += 5;
+
+        // Table Header
+        const colWTask = 100;
+        const colWOwner = 46;
+        const colWDeadline = contentWidth - colWTask - colWOwner;
+
+        doc.setFillColor(241, 245, 249);
+        doc.rect(margin, y, contentWidth, 6, 'F');
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(8);
+        doc.setTextColor(51, 65, 85);
+        doc.text('Task Description', margin + 2, y + 4.2);
+        doc.text('Assigned Owner', margin + colWTask + 2, y + 4.2);
+        doc.text('Deadline', margin + colWTask + colWOwner + 2, y + 4.2);
+        y += 6;
+
+        // Table Rows
+        doc.setFont('helvetica', 'normal');
+        doc.setTextColor(15, 23, 42);
+
+        validActions.forEach((act) => {
+            let taskText = '';
+            let ownerText = 'Unassigned';
+            let deadlineText = 'Not specified';
+
+            if (typeof act === 'object' && act !== null) {
+                taskText = stripMarkdown(act.task || act.description || '');
+                ownerText = stripMarkdown(act.owner || 'Unassigned');
+                deadlineText = stripMarkdown(act.deadline || 'Not specified');
+            } else {
+                taskText = stripMarkdown(String(act));
+            }
+
+            const wrappedTask = doc.splitTextToSize(taskText, colWTask - 4);
+            const wrappedOwner = doc.splitTextToSize(ownerText, colWOwner - 4);
+            const wrappedDeadline = doc.splitTextToSize(deadlineText, colWDeadline - 4);
+
+            const rowLines = Math.max(wrappedTask.length, wrappedOwner.length, wrappedDeadline.length);
+            const rowH = Math.max(5.5, rowLines * 4 + 2);
+
+            checkAddPage(rowH);
+
+            doc.text(wrappedTask, margin + 2, y + 3.8);
+            doc.text(wrappedOwner, margin + colWTask + 2, y + 3.8);
+            doc.text(wrappedDeadline, margin + colWTask + colWOwner + 2, y + 3.8);
+
+            doc.setDrawColor(226, 232, 240);
+            doc.setLineWidth(0.2);
+            doc.line(margin, y + rowH, margin + contentWidth, y + rowH);
+
+            y += rowH;
+        });
+        y += 4;
+    }
+
+    // 5. Pending Issues (omitted if empty)
+    const rawPending = momSummary.pending_issues || momData?.unresolved_questions || [];
+    const validPending = Array.isArray(rawPending)
+        ? rawPending.filter(p => {
+            const clean = String(p).trim().toLowerCase();
+            return clean && !['none', 'none identified', 'none identified during the meeting.', 'n/a', 'not discussed'].includes(clean);
+        })
+        : [];
+
+    if (validPending.length > 0) {
+        checkAddPage(12);
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(9.5);
+        doc.setTextColor(15, 23, 42);
+        doc.text('Pending Issues', margin, y);
+        y += 5;
+
+        doc.setFont('helvetica', 'normal');
+        doc.setFontSize(8.5);
+        doc.setTextColor(51, 65, 85);
+
+        validPending.forEach((issue) => {
+            const issueText = stripMarkdown(String(issue));
+            const wrappedIssue = doc.splitTextToSize(`•  ${issueText}`, contentWidth - 4);
+            checkAddPage(wrappedIssue.length * 4.2 + 1);
+            doc.text(wrappedIssue, margin + 2, y);
+            y += wrappedIssue.length * 4.2 + 1.5;
+        });
+        y += 3;
+    }
+
+    // 6. Conclusion
+    const rawConclusion = momSummary.conclusion || momData?.conclusion;
+    if (rawConclusion && rawConclusion.trim()) {
+        const conclusionText = stripMarkdown(rawConclusion);
+        checkAddPage(12);
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(9.5);
+        doc.setTextColor(15, 23, 42);
+        doc.text('Conclusion', margin, y);
+        y += 5;
+
+        doc.setFont('helvetica', 'normal');
+        doc.setFontSize(8.5);
+        doc.setTextColor(51, 65, 85);
+        const wrappedConclusion = doc.splitTextToSize(conclusionText, contentWidth);
+        checkAddPage(wrappedConclusion.length * 4.2 + 2);
+        doc.text(wrappedConclusion, margin, y);
+        y += wrappedConclusion.length * 4.2 + 4;
+    }
+
+    // ── Optional: Follow-Up Questions (if available and requested) ──────
+    if (followUpMessages && followUpMessages.length > 0) {
+        checkAddPage(16);
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(9.5);
+        doc.setTextColor(15, 23, 42);
+        doc.text('Follow-Up Q&A History', margin, y);
+        y += 5;
+
+        followUpMessages.forEach((msg) => {
+            const isUser = msg.message_by === 'user';
+            const sender = isUser ? 'User' : 'MeetSpace AI';
+            const cleanContent = stripMarkdown(msg.content || '');
+            const wrapped = doc.splitTextToSize(`${sender}: ${cleanContent}`, contentWidth - 6);
+            const cardH = wrapped.length * 4 + 3;
+
+            checkAddPage(cardH);
+
+            doc.setFillColor(isUser ? 248 : 240, isUser ? 250 : 249, isUser ? 252 : 255);
+            doc.roundedRect(margin, y, contentWidth, cardH, 1, 1, 'F');
+
+            doc.setFont('helvetica', isUser ? 'normal' : 'normal');
+            doc.setFontSize(8);
+            doc.setTextColor(30, 41, 59);
+            doc.text(wrapped, margin + 3, y + 3.2);
+
+            y += cardH + 2;
+        });
+    }
+
+    // ── Running Header & Footer on All Pages ────────────────────────────
     const totalPages = doc.getNumberOfPages();
     for (let i = 1; i <= totalPages; i++) {
         doc.setPage(i);
+
+        // Header on pages > 1
+        if (i > 1) {
+            doc.setFont('helvetica', 'normal');
+            doc.setFontSize(7.5);
+            doc.setTextColor(148, 163, 184);
+            doc.text('MeetSpace Meeting Report • Confidential', margin, 10);
+            doc.text(displayTitle.slice(0, 45), margin + contentWidth, 10, { align: 'right' });
+
+            doc.setDrawColor(226, 232, 240);
+            doc.setLineWidth(0.2);
+            doc.line(margin, 12, margin + contentWidth, 12);
+        }
+
+        // Running Footer
+        doc.setDrawColor(226, 232, 240);
+        doc.setLineWidth(0.2);
+        doc.line(margin, pageHeight - 11, margin + contentWidth, pageHeight - 11);
+
         doc.setFont('helvetica', 'normal');
         doc.setFontSize(7.5);
         doc.setTextColor(148, 163, 184);
-        doc.setDrawColor(226, 232, 240);
-        doc.setLineWidth(0.3);
-        doc.line(margin, pageHeight - 12, margin + contentWidth, pageHeight - 12);
-
-        doc.text('MeetSpace • Meeting Summary & AI Report', margin, pageHeight - 8);
-        doc.text(`Page ${i} of ${totalPages}`, margin + contentWidth, pageHeight - 8, { align: 'right' });
+        doc.text('MeetSpace • Confidential Meeting Report', margin, pageHeight - 7);
+        doc.text(`Page ${i} of ${totalPages}`, margin + contentWidth, pageHeight - 7, { align: 'right' });
     }
 
-    // Save PDF
     const filename = sanitizeFilename(meetingId);
     doc.save(filename);
     return filename;

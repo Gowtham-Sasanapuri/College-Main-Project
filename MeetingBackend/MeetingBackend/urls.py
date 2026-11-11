@@ -57,6 +57,14 @@ urlpatterns = [
     # Email Delivery endpoints
     path("meeting/send-report/", views.SendMeetingReport),
     path("roomMeeting/send-report/", room_views.SendRoomMeetingReport),
+
+    # Meeting Management, Scheduling, Agenda & MoM endpoints
+    path("meeting/list/", views.ListMeetings),
+    path("meeting/start/<str:meeting_id>/", views.StartMeeting),
+    path("meeting/cancel/<str:meeting_id>/", views.CancelMeeting),
+    path("meeting/update/<str:meeting_id>/", views.UpdateMeeting),
+    path("meeting/agenda/<int:item_id>/", views.UpdateAgendaItem),
+    path("meeting/mom/<str:meeting_id>/", views.MeetingMoMView),
 ]
 
 
