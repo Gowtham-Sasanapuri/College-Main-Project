@@ -46,6 +46,7 @@ ALLOWED_HOSTS = [
                     "college-main-project-v8t5.onrender.com",
                     "localhost",
                     "127.0.0.1",
+                    "college-main-project-ten.vercel.app"
                 ]
 
 
