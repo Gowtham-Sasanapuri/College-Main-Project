@@ -1,7 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { API_BASE } from '../../config';
 import styles from './FollowUpChat.module.css';
-
-const API_BASE = 'http://127.0.0.1:8000';
 
 const SUGGESTED_PROMPTS = [
     'What were the main decisions made during this meeting?',

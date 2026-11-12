@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
+import { API_BASE } from '../../config';
 import styles from './TranscriptPanel.module.css';
 
 /**
@@ -74,7 +75,7 @@ const TranscriptPanel = ({
         setEditError('');
 
         try {
-            const response = await fetch(`http://127.0.0.1:8000/transcript/edit/${entry.id}/`, {
+            const response = await fetch(`${API_BASE}/transcript/edit/${entry.id}/`, {
                 method: 'PATCH',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({

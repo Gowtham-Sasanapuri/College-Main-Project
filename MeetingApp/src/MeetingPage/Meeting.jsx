@@ -8,9 +8,8 @@ import ControlBar from './components/ControlBar';
 import TranscriptPanel from './components/TranscriptPanel';
 import FollowUpChat from './components/FollowUpChat';
 import MeetingDetailsDrawer from './components/MeetingDetailsDrawer';
+import { API_BASE } from '../config';
 import styles from './Meeting.module.css';
-
-const API_BASE = 'http://127.0.0.1:8000';
 
 const Meeting = () => {
     const { id } = useParams();
@@ -265,7 +264,7 @@ const Meeting = () => {
         setSummaryReady(false);
 
         try {
-            const response = await fetch('http://127.0.0.1:8000/endMeeting/', {
+            const response = await fetch(`${API_BASE}/endMeeting/`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({

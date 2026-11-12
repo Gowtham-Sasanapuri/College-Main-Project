@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { API_BASE, WS_BASE } from '../../config';
 
 const ICE_SERVERS = {
     iceServers: [
@@ -268,7 +269,7 @@ export function useWebRTC(meetingId, userName, userEmail = '', initialAiEnabled 
     // ── WebSocket ─────────────────────────────────────────────────────
 
     const openSocket = useCallback((transcriptHistory) => {
-        const ws = new WebSocket(`ws://127.0.0.1:8000/ws/Meeting/${meetingId}`);
+        const ws = new WebSocket(`${WS_BASE}/ws/Meeting/${meetingId}`);
         socket.current = ws;
 
         ws.onopen = () => {
@@ -282,8 +283,12 @@ export function useWebRTC(meetingId, userName, userEmail = '', initialAiEnabled 
             setConnectionStatus('error');
         };
 
-        ws.onclose = () => {
-            console.log('[WS] Closed');
+        ws.onclose = (event) => {
+            console.log('[WS] Closed',{
+        code: event.code,
+        reason: event.reason,
+        wasClean: event.wasClean
+    });
         };
 
         ws.onmessage = async (event) => {
@@ -394,7 +399,7 @@ export function useWebRTC(meetingId, userName, userEmail = '', initialAiEnabled 
     // ── Lifecycle ─────────────────────────────────────────────────────
 
     useEffect(() => {
-        fetch('http://127.0.0.1:8000/JoinMeeting/', {
+        fetch(`${API_BASE}/JoinMeeting/`, {
             method:  'POST',
             headers: { 'Content-Type': 'application/json' },
             body:    JSON.stringify({ id: meetingId, name: userName, email: userEmail }),

@@ -2,9 +2,8 @@ import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import Navbar from '../Front/components/Navbar/Navbar';
 import { generateMeetingPdfReport } from '../utils/generatePdfReport';
+import { API_BASE } from '../config';
 import styles from './MeetingSummaryMoM.module.css';
-
-const API_BASE = 'http://127.0.0.1:8000';
 
 const MeetingSummaryMoM = () => {
     const { id } = useParams();

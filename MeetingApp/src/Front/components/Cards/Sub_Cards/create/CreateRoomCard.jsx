@@ -3,6 +3,7 @@ import styles from './CreateCard.module.css';
 import link from '../../assets/link-svgrepo-com.svg';
 import Copy from '../../assets/copy-4-svgrepo-com.svg';
 import { useNavigate } from 'react-router-dom';
+import { API_BASE } from '../../../../../config';
 
 const CreateRoomCard = ({ Create }) => {
     const nav = useNavigate();
@@ -96,7 +97,7 @@ const CreateRoomCard = ({ Create }) => {
             agenda_items: agendaItems.filter((a) => a.title.trim() !== ''),
         };
 
-        fetch('http://127.0.0.1:8000/roomMeeting/create/', {
+        fetch(`${API_BASE}/roomMeeting/create/`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(payload),

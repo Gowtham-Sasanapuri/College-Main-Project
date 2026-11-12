@@ -2,9 +2,8 @@ import React, { useState, useRef, useEffect } from 'react';
 import { useParams, useLocation, useNavigate } from 'react-router-dom';
 import FollowUpChat from './components/FollowUpChat';
 import { generateMeetingPdfReport } from '../utils/generatePdfReport';
+import { API_BASE } from '../config';
 import styles from './RoomMeeting.module.css';
-
-const API_BASE = 'http://127.0.0.1:8000';
 
 const RoomMeeting = () => {
     const { id } = useParams();

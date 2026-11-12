@@ -4,6 +4,7 @@ import Cam from '../../assets/video-svgrepo-com.svg';
 import link from '../../assets/link-svgrepo-com.svg';
 import Copy from '../../assets/copy-4-svgrepo-com.svg';
 import { useNavigate } from 'react-router-dom';
+import { API_BASE } from '../../../../../config';
 
 const CreateCard = ({ Create }) => {
     const nav = useNavigate();
@@ -94,7 +95,7 @@ const CreateCard = ({ Create }) => {
             agenda_items: agendaItems.filter((a) => a.title.trim() !== ''),
         };
 
-        fetch('http://127.0.0.1:8000/createLink/', {
+        fetch(`${API_BASE}/createLink/`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(payload),
