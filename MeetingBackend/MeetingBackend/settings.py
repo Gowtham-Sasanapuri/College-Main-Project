@@ -159,8 +159,10 @@ CHANNEL_LAYERS = {
 
     "BACKEND": "channels_redis.core.RedisChannelLayer",
     "CONFIG": {
-        "hosts" : [
-            os.getenv("REDIS_URL")
+        "hosts" : [{
+            "address" : os.getenv("REDIS_URL"),
+            "socket_timeout": None,
+        }
         ],
     },
 
