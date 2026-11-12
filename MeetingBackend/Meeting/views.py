@@ -39,7 +39,10 @@ def _call_gemini_chat(contents, system_instruction=None):
 
     logger.info("[GEMINI] sending request")
     try:
-        client = genai.Client(api_key=gemini_api_key)
+        client = genai.Client(api_key=gemini_api_key,
+        http_options=types.HttpOptions(
+        api_version="v1beta"
+    ))
         config = None
         if system_instruction:
             config = types.GenerateContentConfig(
