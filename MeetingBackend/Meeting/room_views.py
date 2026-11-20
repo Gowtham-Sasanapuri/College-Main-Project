@@ -112,13 +112,34 @@ def ProcessRoomAudio(request):
     meeting_id = request.data.get("meeting_id")
     audio_file = request.FILES.get("audio")
 
+    logger.info(
+    f"[PROCESS_ROOM_AUDIO] Received meeting_id: {meeting_id}"
+    )
+
+    logger.info(
+        f"[PROCESS_ROOM_AUDIO] Audio received: {audio_file is not None}"
+    )
+
+    logger.info(
+        f"[PROCESS_ROOM_AUDIO] Total meetings in database: "
+        f"{Meeting.objects.count()}"
+    )
+
     if not meeting_id or not audio_file:
         return Response({"success": False, "message": "Missing meeting_id or audio file."}, status=400)
 
     try:
         meeting = Meeting.objects.get(Meeting_id=meeting_id)
     except Meeting.DoesNotExist:
-        return Response({"success": False, "message": "Meeting not found."}, status=404)
+        logger.error(
+            f"[PROCESS_ROOM_AUDIO] Meeting ID not found: {meeting_id}"
+        )
+
+        return Response({
+            "success": False,
+            "message": "Meeting not found.",
+            "received_meeting_id": str(meeting_id),
+        }, status=404)
 
     # Save uploaded audio file to temporary file
     file_ext = os.path.splitext(audio_file.name)[1] or ".webm"
